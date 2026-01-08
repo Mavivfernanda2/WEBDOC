@@ -126,9 +126,25 @@ if st.button("🚀 PROSES") and files:
                     for img in imgs:
                         watermark_img(img, watermark)
 
-            elif mode == "PNG → Remove Background":
-                out = f"output/no_bg_{f.name}"
-                remove_bg(path, out)
+           elif mode == "PNG → Remove Background":
+    out = f"output/no_bg_{f.name}"
+    remove_bg(path, out)
+
+    st.image(out, caption=f"Hasil: {f.name}", width=250)
+
+    with open(out, "rb") as img_file:
+        st.download_button(
+            label="⬇️ Download PNG",
+            data=img_file,
+            file_name=f"no_bg_{f.name}",
+            mime="image/png"
+        )
+
+            download_mode = st.radio(
+    "📥 Opsi Download",
+    ["Download PNG", "Download ZIP"],
+    horizontal=True
+)
 
             elif mode == "PDF → Word":
                 out = f"output/{f.name.replace('.pdf','.docx')}"
