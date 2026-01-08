@@ -75,13 +75,33 @@ def add_watermark(img_path, text):
     draw.text((20, img.height - 40), text, fill=(150,150,150,120))
     img.save(img_path)
 
-if school_mode:
-    doc_type = st.selectbox("Jenis Dokumen Sekolah", ["Rapor", "Soal", "Nilai", "Surat"])
-    preset = {
-        "Rapor": (300, "RAPOR"),
-        "Soal": (200, "SOAL"),
-        "Nilai": (300, "NILAI"),
-        "Surat": (300, "SURAT"),
+conversion_mode = st.selectbox(
+    "📂 Pilih Jenis Konversi",
+    [
+        "PDF → PNG",
+        "PDF → Word",
+        "Word → PDF",
+        "Excel → PDF"
+    ]
+)
+if conversion_mode == "PDF → Word":
+    for f in files:
+        pdf_path = save_temp(f)
+        out = pdf_path.replace(".pdf", ".docx")
+        pdf_to_word(pdf_path, out)
+
+elif conversion_mode == "Word → PDF":
+    for f in files:
+        docx_path = save_temp(f)
+        out = docx_path.replace(".docx", ".pdf")
+        word_to_pdf(docx_path, out)
+
+elif conversion_mode == "Excel → PDF":
+    for f in files:
+        xlsx_path = save_temp(f)
+        out = xlsx_path.replace(".xlsx", ".pdf")
+        excel_to_pdf(xlsx_path, out)
+
     }
     dpi, prefix = preset[doc_type]
     school = st.text_input("Nama Sekolah")
