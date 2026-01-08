@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from rembg import remove
 
 # ================= PAGE CONFIG =================
-st.set_page_config(page_title="MassDoc Converter", layout="centered")
+st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
 
 # ================= STYLE =================
 st.markdown("""
