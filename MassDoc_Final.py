@@ -119,6 +119,21 @@ def excel_to_pdf(xlsx, out):
             y = h - 40
     c.save()
 
+def preview_pdf(pdf_path):
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            "👀 Preview / Download PDF",
+            f,
+            file_name=os.path.basename(pdf_path),
+            mime="application/pdf"
+        )
+
+def clean_temp():
+    for f in os.listdir():
+        if f.startswith("temp_"):
+            os.remove(f)
+
+
 # ================= UI =================
 mode = st.selectbox("📂 Pilih Mode Konversi", [
     "PDF → PNG",
@@ -149,19 +164,27 @@ files = st.file_uploader(
 if st.button("🚀 PROSES") and files:
     os.makedirs("output", exist_ok=True)
     results = []
+    bar = st.progress(0)
 
     if mode == "PNG → PDF":
-        imgs = [save_temp(f) for f in files]
+        imgs = [save_temp(f) for f in files if f.type == "image/png"]
         out_pdf = "output/PNG_to_PDF.pdf"
         png_to_pdf(imgs, out_pdf)
+
         st.success("✅ Berhasil")
-        st.download_button("⬇️ Download PDF", open(out_pdf, "rb"), file_name="PNG_to_PDF.pdf")
+        preview_pdf(out_pdf)
+
+        zip_path = "HASIL_KONVERSI.zip"
+        with zipfile.ZipFile(zip_path, "w") as z:
+            z.write(out_pdf, arcname="PNG_to_PDF.pdf")
+
+        st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
 
     else:
         for i, f in enumerate(files):
             path = save_temp(f)
 
-            if mode == "PDF → PNG":
+            if mode == "PDF → PNG" and f.type == "application/pdf":
                 out_dir = f"output/pdf_png_{i}"
                 os.makedirs(out_dir, exist_ok=True)
                 imgs = pdf_to_png(path, out_dir, dpi)
@@ -170,22 +193,47 @@ if st.button("🚀 PROSES") and files:
                         watermark_img(img, watermark)
                 results.extend(imgs)
 
-            elif mode == "PNG → Remove Background":
+            elif mode == "PNG → Remove Background" and f.type == "image/png":
                 out = f"output/no_bg_{os.path.splitext(f.name)[0]}.png"
                 remove_bg_img(path, out)
                 results.append(out)
 
-            elif mode == "PDF → Word":
+            elif mode == "PDF → Word" and f.type == "application/pdf":
                 out = f"output/{f.name.replace('.pdf','.docx')}"
                 pdf_to_word(path, out)
+                results.append(out)
 
-            elif mode == "Word → PDF":
+            elif mode == "Word → PDF" and f.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 out = f"output/{f.name.replace('.docx','.pdf')}"
                 word_to_pdf(path, out)
+                results.append(out)
 
-            elif mode == "Excel → PDF":
+            elif mode == "Excel → PDF" and f.type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
                 out = f"output/{f.name.replace('.xlsx','.pdf')}"
                 excel_to_pdf(path, out)
+                results.append(out)
+
+            bar.progress((i + 1) / len(files))
+
+        # ===== PREVIEW =====
+        if results:
+            st.subheader("👀 Preview Hasil")
+
+            if results[0].endswith(".png"):
+                preview_images(results)
+            elif results[0].endswith(".pdf"):
+                preview_pdf(results[0])
+
+            zip_path = "HASIL_KONVERSI.zip"
+            with zipfile.ZipFile(zip_path, "w") as z:
+                for r in results:
+                    z.write(r, arcname=os.path.basename(r))
+
+            st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
+
+        clean_temp()
+        st.success("🎉 Proses Selesai")
+
 
         # ===== PREVIEW IMAGE =====
         if results:
