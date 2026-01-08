@@ -10,7 +10,10 @@ from reportlab.pdfgen import canvas
 from rembg import remove
 
 # ================= PAGE CONFIG =================
-st.set_page_config("Apiep Doc Converter", layout="centered")
+st.set_page_config(
+    page_title="Apiep Doc Converter",
+    layout="centered"
+)
 
 # ================= AUTH CONFIG =================
 USERS = {
@@ -40,13 +43,11 @@ def login_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= LOGOUT =================
+# ================= LOGOUT FIXED =================
 def logout_button():
-    col1, col2 = st.columns([6,1])
-    with col2:
-        if st.button("🚪 Logout"):
-            st.session_state.clear()
-            st.rerun()
+    if st.button("🚪 Logout", key="logout"):
+        st.session_state.clear()
+        st.rerun()
 
 # ================= AUTH GUARD =================
 if not st.session_state.logged_in:
@@ -59,6 +60,7 @@ st.markdown("""
 html, body {
     background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
 }
+
 .glass {
     background: rgba(255,255,255,0.12);
     backdrop-filter: blur(16px);
@@ -67,30 +69,52 @@ html, body {
     box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     margin-bottom: 25px;
 }
-h1,h2,h3,label,p { color: white !important; }
+
+h1,h2,h3,label,p {
+    color: white !important;
+}
+
 .stButton>button {
     background: linear-gradient(90deg,#00c6ff,#0072ff);
-    color:white; border-radius:14px;
-    padding:0.7em 1.6em; font-weight:600;
+    color:white;
+    border-radius:14px;
+    padding:0.6em 1.4em;
+    font-weight:600;
 }
+
+/* File uploader */
 [data-testid="stFileUploader"] {
     border:2px dashed rgba(255,255,255,0.4);
     border-radius:20px;
     padding:25px;
     background:rgba(255,255,255,0.05);
 }
+
+/* LOGOUT FIXED */
+div[data-testid="column"]:has(button[key="logout"]) {
+    position: fixed;
+    top: 18px;
+    right: 20px;
+    z-index: 9999;
+}
+
+button[key="logout"] {
+    background: linear-gradient(90deg,#ff416c,#ff4b2b) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
 </style>
 """, unsafe_allow_html=True)
+
+# ================= LOGOUT BUTTON RENDER =================
+logout_button()
 
 # ================= HEADER =================
 st.markdown(f"""
 <div class="glass">
-<h1>🧰 Apiep Doc Converter</h1>
-<p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
+    <h1>🧰 Apiep Doc Converter</h1>
+    <p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
 </div>
 """, unsafe_allow_html=True)
-
-logout_button()
 
 # ================= HELPERS =================
 def save_temp(file):
@@ -134,7 +158,9 @@ def preview_pdf(path):
         st.download_button("📄 Download PDF", f, file_name=os.path.basename(path))
 
 def pdf_to_word(pdf, out):
-    c = Converter(pdf); c.convert(out); c.close()
+    c = Converter(pdf)
+    c.convert(out)
+    c.close()
 
 def word_to_pdf(docx, out):
     convert(docx, out)
@@ -143,6 +169,7 @@ def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
     c = canvas.Canvas(out, pagesize=A4)
     y = A4[1] - 40
+
     for _, row in df.iterrows():
         x = 40
         for cell in row:
@@ -150,13 +177,15 @@ def excel_to_pdf(xlsx, out):
             x += 100
         y -= 20
         if y < 40:
-            c.showPage(); y = A4[1] - 40
+            c.showPage()
+            y = A4[1] - 40
+
     c.save()
 
 # ================= UI =================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
-dpi = st.selectbox("Resolusi DPI", [150,200,300])
+dpi = st.selectbox("Resolusi DPI", [150, 200, 300])
 school_mode = st.toggle("🏫 Mode Sekolah")
 
 if school_mode:
@@ -197,39 +226,49 @@ if process and files:
         if mode == "PDF → PNG" and ext == ".pdf":
             imgs = pdf_to_png(path, "output", dpi)
             if watermark:
-                for img in imgs: watermark_img(img, watermark)
+                for img in imgs:
+                    watermark_img(img, watermark)
             results.extend(imgs)
 
         elif mode == "PDF → Word" and ext == ".pdf":
             out = f"output/{f.name.replace('.pdf','.docx')}"
-            pdf_to_word(path, out); results.append(out)
+            pdf_to_word(path, out)
+            results.append(out)
 
         elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
             out = f"output/{f.name}.pdf"
-            png_to_pdf([path], out); results.append(out)
+            png_to_pdf([path], out)
+            results.append(out)
 
         elif mode == "PNG → Remove Background":
             out = f"output/no_bg_{f.name}.png"
-            remove_bg_img(path, out); results.append(out)
+            remove_bg_img(path, out)
+            results.append(out)
 
         elif mode == "Word → PDF" and ext == ".docx":
             out = f"output/{f.name.replace('.docx','.pdf')}"
-            word_to_pdf(path, out); results.append(out)
+            word_to_pdf(path, out)
+            results.append(out)
 
         elif mode == "Excel → PDF" and ext == ".xlsx":
             out = f"output/{f.name.replace('.xlsx','.pdf')}"
-            excel_to_pdf(path, out); results.append(out)
+            excel_to_pdf(path, out)
+            results.append(out)
 
-        bar.progress((i+1)/len(files))
+        bar.progress((i + 1) / len(files))
 
     if results:
         st.subheader("👀 Preview")
         preview_images(results) if results[0].endswith(".png") else preview_pdf(results[0])
 
         zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path,"w") as z:
+        with zipfile.ZipFile(zip_path, "w") as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
 
-        st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
+        st.download_button(
+            "📦 Download ZIP",
+            open(zip_path, "rb"),
+            file_name=zip_path
+        )
         st.success("🎉 Proses Selesai")
