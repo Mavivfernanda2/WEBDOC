@@ -33,6 +33,11 @@ def pdf_to_word(pdf_path, output_docx):
     cv.convert(output_docx)
     cv.close()
 
+from docx2pdf import convert
+
+def word_to_pdf(docx_path, output_pdf):
+    convert(docx_path, output_pdf)
+
 def add_watermark(img_path, text):
     img = Image.open(img_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
