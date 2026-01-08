@@ -38,6 +38,37 @@ from docx2pdf import convert
 def word_to_pdf(docx_path, output_pdf):
     convert(docx_path, output_pdf)
 
+import pandas as pd
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
+def excel_to_pdf(excel_path, pdf_path):
+    df = pd.read_excel(excel_path)
+
+    c = canvas.Canvas(pdf_path, pagesize=A4)
+    width, height = A4
+
+    x, y = 40, height - 40
+
+    for col in df.columns:
+        c.drawString(x, y, str(col))
+        x += 100
+
+    y -= 20
+
+    for _, row in df.iterrows():
+        x = 40
+        for cell in row:
+            c.drawString(x, y, str(cell))
+            x += 100
+        y -= 20
+        if y < 40:
+            c.showPage()
+            y = height - 40
+
+    c.save()
+
+
 def add_watermark(img_path, text):
     img = Image.open(img_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
