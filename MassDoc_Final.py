@@ -43,7 +43,7 @@ def login_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= LOGOUT FIXED =================
+# ================= LOGOUT =================
 def logout_button():
     if st.button("🚪 Logout", key="logout"):
         st.session_state.clear()
@@ -90,7 +90,7 @@ h1,h2,h3,label,p {
     background:rgba(255,255,255,0.05);
 }
 
-/* LOGOUT FIXED */
+/* Logout fixed top-right */
 div[data-testid="column"]:has(button[key="logout"]) {
     position: fixed;
     top: 18px;
@@ -105,7 +105,7 @@ button[key="logout"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ================= LOGOUT BUTTON RENDER =================
+# ================= LOGOUT RENDER =================
 logout_button()
 
 # ================= HEADER =================
@@ -185,7 +185,17 @@ def excel_to_pdf(xlsx, out):
 # ================= UI =================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
-dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800,])
+# 🔼 MODE KONVERSI DI ATAS
+mode = st.selectbox("📂 Mode Konversi", [
+    "PDF → PNG",
+    "PDF → Word",
+    "PNG → PDF",
+    "PNG → Remove Background",
+    "Word → PDF",
+    "Excel → PDF"
+])
+
+dpi = st.selectbox("Resolusi DPI", [150, 200, 300])
 school_mode = st.toggle("🏫 Mode Sekolah")
 
 if school_mode:
@@ -200,15 +210,6 @@ files = st.file_uploader(
     accept_multiple_files=True,
     type=["pdf","png","jpg","jpeg","docx","xlsx"]
 )
-
-mode = st.selectbox("📂 Mode Konversi", [
-    "PDF → PNG",
-    "PDF → Word",
-    "PNG → PDF",
-    "PNG → Remove Background",
-    "Word → PDF",
-    "Excel → PDF"
-])
 
 process = st.button("🚀 PROSES")
 st.markdown('</div>', unsafe_allow_html=True)
@@ -266,9 +267,5 @@ if process and files:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
 
-        st.download_button(
-            "📦 Download ZIP",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
+        st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
         st.success("🎉 Proses Selesai")
