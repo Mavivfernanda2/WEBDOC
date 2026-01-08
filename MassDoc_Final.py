@@ -40,7 +40,7 @@ h1, h2, h3, label { color: white !important; }
 """, unsafe_allow_html=True)
 
 # ================= HEADER =================
-st.title("🧰 MassDoc Converter")
+st.title("Apiep Doc Converter")
 st.caption("Upload → Convert → Preview → Download")
 
 st.markdown("""
