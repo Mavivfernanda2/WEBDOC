@@ -18,40 +18,41 @@ st.set_page_config(
 )
 
 # =====================================================
-# AUTH CONFIG (LOGIN GURU)
+# =====================================================
+# AUTH CONFIG (LOGIN GURU) - FIXED
 # =====================================================
 USERS = {
     "guru": "apiep123",
     "admin": "admin123"
 }
 
-if "login" not in st.session_state:
-    st.session_state.login = False
+if "is_login" not in st.session_state:
+    st.session_state.is_login = False
     st.session_state.user = ""
 
 def login_page():
     st.markdown("""
     <div class="glass">
     <h2>🔐 Login Guru</h2>
-    <p>Gunakan akun resmi untuk mengakses aplikasi</p>
+    <p>Gunakan akun resmi</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("login"):
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
+    with st.form("login_form"):  # ✅ GANTI KEY
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
         submit = st.form_submit_button("Login")
 
         if submit:
-            if u in USERS and USERS[u] == p:
-                st.session_state.login = True
-                st.session_state.user = u
+            if username in USERS and USERS[username] == password:
+                st.session_state.is_login = True
+                st.session_state.user = username
                 st.success("Login berhasil")
                 st.rerun()
             else:
                 st.error("Username / Password salah")
 
-if not st.session_state.login:
+if not st.session_state.is_login:
     login_page()
     st.stop()
 
@@ -92,7 +93,8 @@ h1,h2,h3,label,p { color: white !important; }
 st.markdown(f"""
 <div class="glass">
 <h1>🧰 Apiep Doc Converter</h1>
-<p>Login sebagai <b>{st.session_state.user}</b></p>
+<p>Login sebagai <b>{st.session_state.is_login
+}</b></p>
 </div>
 """, unsafe_allow_html=True)
 
