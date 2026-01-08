@@ -26,6 +26,13 @@ def pdf_to_png(pdf_path, output_dir, dpi):
         images.append(out)
     return images
 
+from pdf2docx import Converter
+
+def pdf_to_word(pdf_path, output_docx):
+    cv = Converter(pdf_path)
+    cv.convert(output_docx)
+    cv.close()
+
 def add_watermark(img_path, text):
     img = Image.open(img_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
