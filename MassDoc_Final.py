@@ -10,16 +10,13 @@ from reportlab.pdfgen import canvas
 from rembg import remove
 
 # ================= PAGE CONFIG =================
-st.set_page_config(
-    page_title="Apiep Doc Converter",
-    layout="centered"
-)
+st.set_page_config("Apiep Doc Converter", layout="centered")
 
 # ================= STYLE =================
 st.markdown("""
 <style>
 html, body {
-    background: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
+    background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
 }
 .glass {
     background: rgba(255,255,255,0.12);
@@ -29,21 +26,17 @@ html, body {
     box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     margin-bottom: 25px;
 }
-h1,h2,h3,label,p {
-    color: white !important;
-}
-.stButton > button {
+h1,h2,h3,label,p { color: white !important; }
+.stButton>button {
     background: linear-gradient(90deg,#00c6ff,#0072ff);
-    color: white;
-    border-radius: 14px;
-    padding: 0.7em 1.6em;
-    font-weight: 600;
+    color:white; border-radius:14px;
+    padding:0.7em 1.6em; font-weight:600;
 }
 [data-testid="stFileUploader"] {
-    border: 2px dashed rgba(255,255,255,0.4);
-    border-radius: 20px;
-    padding: 25px;
-    background: rgba(255,255,255,0.05);
+    border:2px dashed rgba(255,255,255,0.4);
+    border-radius:20px;
+    padding:25px;
+    background:rgba(255,255,255,0.05);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -65,11 +58,10 @@ def save_temp(file):
 
 def pdf_to_png(pdf, out_dir, dpi):
     zoom = dpi / 72
-    mat = fitz.Matrix(zoom, zoom)
     doc = fitz.open(pdf)
     results = []
     for i, page in enumerate(doc):
-        pix = page.get_pixmap(matrix=mat)
+        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
         out = f"{out_dir}/page_{i+1}.png"
         pix.save(out)
         results.append(out)
@@ -79,14 +71,13 @@ def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
     imgs[0].save(out_pdf, save_all=True, append_images=imgs[1:])
 
-def remove_bg_img(img_path, out_path):
-    img = Image.open(img_path).convert("RGBA")
-    remove(img).save(out_path, format="PNG")
+def remove_bg_img(img, out):
+    remove(Image.open(img).convert("RGBA")).save(out, format="PNG")
 
 def watermark_img(img_path, text):
     img = Image.open(img_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
-    draw.text((20, img.height - 40), text, fill=(180,180,180,120))
+    draw.text((20, img.height-40), text, fill=(180,180,180,120))
     img.save(img_path)
 
 def preview_images(imgs):
@@ -104,24 +95,33 @@ def preview_pdf(path):
             mime="application/pdf"
         )
 
-# ================= MODE SELECTION (WRAP) =================
+def pdf_to_word(pdf, out):
+    c = Converter(pdf); c.convert(out); c.close()
+
+def word_to_pdf(docx, out):
+    convert(docx, out)
+
+def excel_to_pdf(xlsx, out):
+    df = pd.read_excel(xlsx)
+    c = canvas.Canvas(out, pagesize=A4)
+    y = A4[1] - 40
+    for _, row in df.iterrows():
+        x = 40
+        for cell in row:
+            c.drawString(x, y, str(cell))
+            x += 100
+        y -= 20
+        if y < 40:
+            c.showPage(); y = A4[1] - 40
+    c.save()
+
+# ================= UI =================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
-mode = st.selectbox(
-    "📂 Pilih Mode Konversi",
-    [
-        "PDF → PNG",
-        "PNG → PDF",
-        "PNG → Remove Background",
-        "PDF → Word",
-        "Word → PDF",
-        "Excel → PDF"
-    ]
-)
-
-dpi = st.selectbox("Resolusi DPI", [150, 200, 300])
+dpi = st.selectbox("Resolusi DPI", [150,200,300])
 school_mode = st.toggle("🏫 Mode Sekolah")
 
+watermark = ""
 if school_mode:
     school = st.text_input("Nama Sekolah")
     year = st.text_input("Tahun Ajaran", "2024/2025")
@@ -129,53 +129,63 @@ if school_mode:
 else:
     watermark = st.text_input("Watermark (opsional)")
 
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ================= UPLOAD AREA (WRAP) =================
-st.markdown("""
-<div class="glass">
-<h3>📤 Upload File</h3>
-<p>Drag & drop file kamu di sini</p>
-</div>
-""", unsafe_allow_html=True)
-
 files = st.file_uploader(
-    "",
-    type=["pdf","png","docx","xlsx"],
-    accept_multiple_files=True
+    "📤 Drag & Drop File",
+    accept_multiple_files=True,
+    type=["pdf","png","jpg","jpeg","docx","xlsx"]
 )
 
+mode = st.selectbox("📂 Mode Konversi", [
+    "PDF → PNG",
+    "PDF → Word",
+    "PNG → PDF",
+    "PNG → Remove Background",
+    "Word → PDF",
+    "Excel → PDF"
+])
+
 process = st.button("🚀 PROSES")
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
     results = []
+    bar = st.progress(0)
 
-    if mode == "PNG → PDF":
-        imgs = [save_temp(f) for f in files]
-        out_pdf = "output/PNG_to_PDF.pdf"
-        png_to_pdf(imgs, out_pdf)
-        preview_pdf(out_pdf)
-        results.append(out_pdf)
+    for i, f in enumerate(files):
+        path = save_temp(f)
+        ext = os.path.splitext(f.name.lower())[1]
 
-    else:
-        for f in files:
-            path = save_temp(f)
+        if mode == "PDF → PNG" and ext == ".pdf":
+            out_dir = "output/pdf_png"
+            os.makedirs(out_dir, exist_ok=True)
+            imgs = pdf_to_png(path, out_dir, dpi)
+            if watermark:
+                for img in imgs: watermark_img(img, watermark)
+            results.extend(imgs)
 
-            if mode == "PDF → PNG":
-                out_dir = f"output/pdf_png"
-                os.makedirs(out_dir, exist_ok=True)
-                imgs = pdf_to_png(path, out_dir, dpi)
-                if watermark:
-                    for img in imgs:
-                        watermark_img(img, watermark)
-                results.extend(imgs)
+        elif mode == "PDF → Word" and ext == ".pdf":
+            out = f"output/{f.name.replace('.pdf','.docx')}"
+            pdf_to_word(path, out); results.append(out)
 
-            elif mode == "PNG → Remove Background":
-                out = f"output/no_bg_{f.name}"
-                remove_bg_img(path, out)
-                results.append(out)
+        elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
+            out = f"output/{f.name}.pdf"
+            png_to_pdf([path], out); results.append(out)
+
+        elif mode == "PNG → Remove Background" and ext in [".png",".jpg",".jpeg"]:
+            out = f"output/no_bg_{f.name}.png"
+            remove_bg_img(path, out); results.append(out)
+
+        elif mode == "Word → PDF" and ext == ".docx":
+            out = f"output/{f.name.replace('.docx','.pdf')}"
+            word_to_pdf(path, out); results.append(out)
+
+        elif mode == "Excel → PDF" and ext == ".xlsx":
+            out = f"output/{f.name.replace('.xlsx','.pdf')}"
+            excel_to_pdf(path, out); results.append(out)
+
+        bar.progress((i+1)/len(files))
 
     # ===== PREVIEW =====
     if results:
@@ -186,14 +196,9 @@ if process and files:
             preview_pdf(results[0])
 
         zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path, "w") as z:
+        with zipfile.ZipFile(zip_path,"w") as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
 
-        st.download_button(
-            "📦 Download ZIP",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
-
+        st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
         st.success("🎉 Proses Selesai")
