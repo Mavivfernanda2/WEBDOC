@@ -9,56 +9,51 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from rembg import remove
 
-# =====================================================
-# PAGE CONFIG
-# =====================================================
-st.set_page_config(
-    page_title="Apiep Doc Converter",
-    layout="centered"
-)
+# ================= PAGE CONFIG =================
+st.set_page_config("Apiep Doc Converter", layout="centered")
 
-# =====================================================
-# =====================================================
-# AUTH CONFIG (LOGIN GURU) - FIXED
-# =====================================================
+# ================= AUTH CONFIG =================
 USERS = {
     "guru": "apiep123",
     "admin": "admin123"
 }
 
-if "is_login" not in st.session_state:
-    st.session_state.is_login = False
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
     st.session_state.user = ""
 
+# ================= LOGIN PAGE =================
 def login_page():
-    st.markdown("""
-    <div class="glass">
-    <h2>🔐 Login Guru</h2>
-    <p>Gunakan akun resmi</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="glass">', unsafe_allow_html=True)
+    st.subheader("🔐 Login Guru")
 
-    with st.form("login_form"):  # ✅ GANTI KEY
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-        submit = st.form_submit_button("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-        if submit:
-            if username in USERS and USERS[username] == password:
-                st.session_state.is_login = True
-                st.session_state.user = username
-                st.success("Login berhasil")
-                st.rerun()
-            else:
-                st.error("Username / Password salah")
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.rerun()
+        else:
+            st.error("❌ Username atau Password salah")
 
-if not st.session_state.is_login:
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ================= LOGOUT =================
+def logout_button():
+    col1, col2 = st.columns([6,1])
+    with col2:
+        if st.button("🚪 Logout"):
+            st.session_state.clear()
+            st.rerun()
+
+# ================= AUTH GUARD =================
+if not st.session_state.logged_in:
     login_page()
     st.stop()
 
-# =====================================================
-# STYLE
-# =====================================================
+# ================= STYLE =================
 st.markdown("""
 <style>
 html, body {
@@ -87,20 +82,17 @@ h1,h2,h3,label,p { color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================================
-# HEADER
-# =====================================================
+# ================= HEADER =================
 st.markdown(f"""
 <div class="glass">
 <h1>🧰 Apiep Doc Converter</h1>
-<p>Login sebagai <b>{st.session_state.is_login
-}</b></p>
+<p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
 </div>
 """, unsafe_allow_html=True)
 
-# =====================================================
-# HELPERS
-# =====================================================
+logout_button()
+
+# ================= HELPERS =================
 def save_temp(file):
     path = f"temp_{file.name}"
     with open(path, "wb") as f:
@@ -139,12 +131,7 @@ def preview_images(imgs):
 
 def preview_pdf(path):
     with open(path, "rb") as f:
-        st.download_button(
-            "👀 Preview / Download PDF",
-            f,
-            file_name=os.path.basename(path),
-            mime="application/pdf"
-        )
+        st.download_button("📄 Download PDF", f, file_name=os.path.basename(path))
 
 def pdf_to_word(pdf, out):
     c = Converter(pdf); c.convert(out); c.close()
@@ -166,9 +153,7 @@ def excel_to_pdf(xlsx, out):
             c.showPage(); y = A4[1] - 40
     c.save()
 
-# =====================================================
-# UI
-# =====================================================
+# ================= UI =================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
 dpi = st.selectbox("Resolusi DPI", [150,200,300])
@@ -199,9 +184,7 @@ mode = st.selectbox("📂 Mode Konversi", [
 process = st.button("🚀 PROSES")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# =====================================================
-# PROCESS
-# =====================================================
+# ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
     results = []
@@ -212,12 +195,9 @@ if process and files:
         ext = os.path.splitext(f.name.lower())[1]
 
         if mode == "PDF → PNG" and ext == ".pdf":
-            out_dir = "output/pdf_png"
-            os.makedirs(out_dir, exist_ok=True)
-            imgs = pdf_to_png(path, out_dir, dpi)
+            imgs = pdf_to_png(path, "output", dpi)
             if watermark:
-                for img in imgs:
-                    watermark_img(img, watermark)
+                for img in imgs: watermark_img(img, watermark)
             results.extend(imgs)
 
         elif mode == "PDF → Word" and ext == ".pdf":
@@ -228,7 +208,7 @@ if process and files:
             out = f"output/{f.name}.pdf"
             png_to_pdf([path], out); results.append(out)
 
-        elif mode == "PNG → Remove Background" and ext in [".png",".jpg",".jpeg"]:
+        elif mode == "PNG → Remove Background":
             out = f"output/no_bg_{f.name}.png"
             remove_bg_img(path, out); results.append(out)
 
@@ -244,10 +224,7 @@ if process and files:
 
     if results:
         st.subheader("👀 Preview")
-        if results[0].endswith(".png"):
-            preview_images(results)
-        else:
-            preview_pdf(results[0])
+        preview_images(results) if results[0].endswith(".png") else preview_pdf(results[0])
 
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path,"w") as z:
