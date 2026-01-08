@@ -9,10 +9,55 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from rembg import remove
 
-# ================= PAGE CONFIG =================
-st.set_page_config("Apiep Doc Converter", layout="centered")
+# =====================================================
+# PAGE CONFIG
+# =====================================================
+st.set_page_config(
+    page_title="Apiep Doc Converter",
+    layout="centered"
+)
 
-# ================= STYLE =================
+# =====================================================
+# AUTH CONFIG (LOGIN GURU)
+# =====================================================
+USERS = {
+    "guru": "apiep123",
+    "admin": "admin123"
+}
+
+if "login" not in st.session_state:
+    st.session_state.login = False
+    st.session_state.user = ""
+
+def login_page():
+    st.markdown("""
+    <div class="glass">
+    <h2>🔐 Login Guru</h2>
+    <p>Gunakan akun resmi untuk mengakses aplikasi</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login"):
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
+
+        if submit:
+            if u in USERS and USERS[u] == p:
+                st.session_state.login = True
+                st.session_state.user = u
+                st.success("Login berhasil")
+                st.rerun()
+            else:
+                st.error("Username / Password salah")
+
+if not st.session_state.login:
+    login_page()
+    st.stop()
+
+# =====================================================
+# STYLE
+# =====================================================
 st.markdown("""
 <style>
 html, body {
@@ -41,15 +86,19 @@ h1,h2,h3,label,p { color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= HEADER =================
-st.markdown("""
+# =====================================================
+# HEADER
+# =====================================================
+st.markdown(f"""
 <div class="glass">
 <h1>🧰 Apiep Doc Converter</h1>
-<p>Upload → Convert → Preview → Download</p>
+<p>Login sebagai <b>{st.session_state.user}</b></p>
 </div>
 """, unsafe_allow_html=True)
 
-# ================= HELPERS =================
+# =====================================================
+# HELPERS
+# =====================================================
 def save_temp(file):
     path = f"temp_{file.name}"
     with open(path, "wb") as f:
@@ -59,13 +108,13 @@ def save_temp(file):
 def pdf_to_png(pdf, out_dir, dpi):
     zoom = dpi / 72
     doc = fitz.open(pdf)
-    results = []
+    res = []
     for i, page in enumerate(doc):
         pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
         out = f"{out_dir}/page_{i+1}.png"
         pix.save(out)
-        results.append(out)
-    return results
+        res.append(out)
+    return res
 
 def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
@@ -115,17 +164,18 @@ def excel_to_pdf(xlsx, out):
             c.showPage(); y = A4[1] - 40
     c.save()
 
-# ================= UI =================
+# =====================================================
+# UI
+# =====================================================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
 dpi = st.selectbox("Resolusi DPI", [150,200,300])
 school_mode = st.toggle("🏫 Mode Sekolah")
 
-watermark = ""
 if school_mode:
     school = st.text_input("Nama Sekolah")
     year = st.text_input("Tahun Ajaran", "2024/2025")
-    watermark = f"{school} — Arsip Resmi — {year}"
+    watermark = f"{school} — {st.session_state.user.upper()} — {year}"
 else:
     watermark = st.text_input("Watermark (opsional)")
 
@@ -147,7 +197,9 @@ mode = st.selectbox("📂 Mode Konversi", [
 process = st.button("🚀 PROSES")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= PROCESS =================
+# =====================================================
+# PROCESS
+# =====================================================
 if process and files:
     os.makedirs("output", exist_ok=True)
     results = []
@@ -162,7 +214,8 @@ if process and files:
             os.makedirs(out_dir, exist_ok=True)
             imgs = pdf_to_png(path, out_dir, dpi)
             if watermark:
-                for img in imgs: watermark_img(img, watermark)
+                for img in imgs:
+                    watermark_img(img, watermark)
             results.extend(imgs)
 
         elif mode == "PDF → Word" and ext == ".pdf":
@@ -187,7 +240,6 @@ if process and files:
 
         bar.progress((i+1)/len(files))
 
-    # ===== PREVIEW =====
     if results:
         st.subheader("👀 Preview")
         if results[0].endswith(".png"):
