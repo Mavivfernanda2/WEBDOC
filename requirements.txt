@@ -3,3 +3,6 @@ pymupdf
 pillow
 pdf2docx
 docx2pdf
+pandas
+openpyxl
+reportlab
