@@ -195,7 +195,7 @@ mode = st.selectbox("📂 Mode Konversi", [
     "Excel → PDF"
 ])
 
-dpi = st.selectbox("Resolusi DPI", [150, 200, 300])
+dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
 school_mode = st.toggle("🏫 Mode Sekolah")
 
 if school_mode:
