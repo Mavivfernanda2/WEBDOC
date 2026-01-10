@@ -92,6 +92,20 @@ def excel_to_pdf(xlsx, out):
             c.showPage()
             y = A4[1] - 40
     c.save()
+    
+# 🎥 AVI → MP4 + RESOLUSI
+def mov_to_mp4(video, out, resolution):
+    clip = VideoFileClip(video)
+
+    if resolution == "480p":
+        clip = clip.resize(height=480)
+    elif resolution == "720p":
+        clip = clip.resize(height=720)
+    elif resolution == "1080p":
+        clip = clip.resize(height=1080)
+
+    clip.write_videofile(out, codec="libx264", audio_codec="aac")
+    clip.close()
 
 # 🎥 MOV → MP4 + RESOLUSI
 def mov_to_mp4(mov, out, resolution):
@@ -134,42 +148,43 @@ mode = st.selectbox("📂 Mode Konversi", [
     "PNG → Remove Background",
     "Word → PDF",
     "Excel → PDF",
-    "MOV → MP4",
     "JPG → PNG",
     "PNG → JPG",
-    "RAR → ZIP"
+    "RAR → ZIP",
+    "MOV → MP4",
+    "AVI → MP4"
 ])
+
 # 🎥 PILIH RESOLUSI VIDEO
 video_res = "Original"
-if mode == "MOV → MP4":
-    video_res = st.selectbox("🎥 Resolusi Video", [
-        "Original", "480p", "720p", "1080p"
-    ])
+if mode in ["MOV → MP4", "AVI → MP4"]:
+    video_res = st.selectbox(
+        "🎥 Resolusi Video",
+        ["Original", "480p", "720p", "1080p"]
+    )
 
 dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
 
 files = st.file_uploader(
     "📤 Upload File",
     accept_multiple_files=True,
-    type=["pdf","png","jpg","jpeg","docx","xlsx","mov","rar"]
+    type=["pdf","png","jpg","jpeg","docx","xlsx","mov","avi","rar"]
 )
 
 process = st.button("🚀 PROSES")
 
 # ================= PROCESS =================
-# ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
 
-    results = []        # dokumen & gambar
-    video_results = []  # video mp4
+    results = []
+    video_results = []
     bar = st.progress(0)
 
     for i, f in enumerate(files):
         path = save_temp(f)
         ext = os.path.splitext(f.name.lower())[1]
 
-        # ========= PDF =========
         if mode == "PDF → PNG" and ext == ".pdf":
             results.extend(pdf_to_png(path, "output", dpi))
 
@@ -178,18 +193,17 @@ if process and files:
             pdf_to_word(path, out)
             results.append(out)
 
-        # ========= IMAGE =========
-        elif mode == "PNG → PDF" and ext in [".png", ".jpg", ".jpeg"]:
+        elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
             out = f"output/{f.name}.pdf"
             png_to_pdf([path], out)
             results.append(out)
 
-        elif mode == "PNG → Remove Background" and ext in [".png", ".jpg", ".jpeg"]:
+        elif mode == "PNG → Remove Background" and ext in [".png",".jpg",".jpeg"]:
             out = f"output/no_bg_{f.name}.png"
             remove_bg_img(path, out)
             results.append(out)
 
-        elif mode == "JPG → PNG" and ext in [".jpg", ".jpeg"]:
+        elif mode == "JPG → PNG" and ext in [".jpg",".jpeg"]:
             out = f"output/{os.path.splitext(f.name)[0]}.png"
             jpg_to_png(path, out)
             results.append(out)
@@ -199,7 +213,6 @@ if process and files:
             png_to_jpg(path, out)
             results.append(out)
 
-        # ========= OFFICE =========
         elif mode == "Word → PDF" and ext == ".docx":
             out = f"output/{f.name.replace('.docx','.pdf')}"
             word_to_pdf(path, out)
@@ -210,19 +223,48 @@ if process and files:
             excel_to_pdf(path, out)
             results.append(out)
 
-        # ========= VIDEO =========
         elif mode == "MOV → MP4" and ext == ".mov":
             out = f"output/{f.name.replace('.mov','.mp4')}"
-            mov_to_mp4(path, out, video_res)
+            video_to_mp4(path, out, video_res)
             video_results.append(out)
 
-        # ========= ARCHIVE =========
+        elif mode == "AVI → MP4" and ext == ".avi":
+            out = f"output/{f.name.replace('.avi','.mp4')}"
+            video_to_mp4(path, out, video_res)
+            video_results.append(out)
+
         elif mode == "RAR → ZIP" and ext == ".rar":
             out = f"output/{os.path.splitext(f.name)[0]}.zip"
             rar_to_zip(path, out)
             results.append(out)
 
         bar.progress((i + 1) / len(files))
+
+    # ZIP NON VIDEO
+    if results:
+        zip_path = "HASIL_KONVERSI.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            for r in results:
+                z.write(r, arcname=os.path.basename(r))
+
+        st.success("🎉 Proses Dokumen & Gambar Selesai")
+        st.download_button(
+            "📦 Download ZIP (Dokumen & Gambar)",
+            open(zip_path, "rb"),
+            file_name=zip_path
+        )
+
+    # DOWNLOAD VIDEO
+    if video_results:
+        st.subheader("🎬 Download Video (Tanpa ZIP)")
+        for v in video_results:
+            with open(v, "rb") as vf:
+                st.download_button(
+                    f"⬇️ Download {os.path.basename(v)}",
+                    vf,
+                    file_name=os.path.basename(v),
+                    mime="video/mp4"
+                )
 
     # ================= ZIP (NON VIDEO) =================
     if results:
