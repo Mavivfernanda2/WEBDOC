@@ -22,7 +22,7 @@ if "logged_in" not in st.session_state:
 
 # ================= LOGIN =================
 def login_page():
-    st.subheader("🔐 Selamat Datang")
+    st.subheader("Selamat Datang")
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
