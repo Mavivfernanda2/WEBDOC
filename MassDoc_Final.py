@@ -1,7 +1,7 @@
 import streamlit as st
 import os, zipfile
 import fitz
-from PIL import Image, ImageDraw
+from PIL import Image
 import pandas as pd
 from pdf2docx import Converter
 from docx2pdf import convert
@@ -92,8 +92,7 @@ def excel_to_pdf(xlsx, out):
             c.showPage()
             y = A4[1] - 40
     c.save()
-    
-# 🎥 AVI → MP4 + RESOLUSI
+
 def video_to_mp4(video_path, out_path, resolution):
     clip = VideoFileClip(video_path)
 
@@ -107,44 +106,23 @@ def video_to_mp4(video_path, out_path, resolution):
         clip = clip.resize(height=1440)
     elif resolution == "4K":
         clip = clip.resize(height=2160)
-    # "Original" → tidak di-resize
 
-    clip.write_videofile(
-        out_path,
-        codec="libx264",
-        audio_codec="aac"
-    )
-    clip.close()
-
-# 🎥 MOV → MP4 + RESOLUSI
-def mov_to_mp4(mov, out, resolution):
-    clip = VideoFileClip(mov)
-
-    if resolution == "480p":
-        clip = clip.resize(height=480)
-    elif resolution == "720p":
-        clip = clip.resize(height=720)
-    elif resolution == "1080p":
-        clip = clip.resize(height=1080)
-    elif resolution == "2K":
-        clip = clip.resize(height=2K)
-
-    clip.write_videofile(out, codec="libx264", audio_codec="aac")
+    clip.write_videofile(out_path, codec="libx264", audio_codec="aac")
     clip.close()
 
 def jpg_to_png(img, out):
     Image.open(img).convert("RGBA").save(out, format="PNG")
 
 def png_to_jpg(img, out, quality=85):
-    bg = Image.new("RGB", Image.open(img).size, (255, 255, 255))
-    bg.paste(Image.open(img), mask=Image.open(img).split()[3] if img.lower().endswith(".png") else None)
+    im = Image.open(img)
+    bg = Image.new("RGB", im.size, (255, 255, 255))
+    bg.paste(im, mask=im.split()[3] if im.mode == "RGBA" else None)
     bg.save(out, format="JPEG", quality=quality)
 
 def rar_to_zip(rar_path, zip_path):
     temp_dir = "temp_rar"
     os.makedirs(temp_dir, exist_ok=True)
     os.system(f'unrar x "{rar_path}" "{temp_dir}"')
-
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for root, _, files in os.walk(temp_dir):
             for f in files:
@@ -166,15 +144,12 @@ mode = st.selectbox("📂 Mode Konversi", [
     "AVI → MP4"
 ])
 
-# 🎥 PILIH RESOLUSI VIDEO
 video_res = "Original"
 if mode in ["MOV → MP4", "AVI → MP4"]:
     video_res = st.selectbox(
         "🎥 Resolusi Video",
         ["Original", "480p", "720p", "1080p", "2K", "4K"]
     )
-else:
-    video_res = "Original"
 
 dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
 
@@ -189,9 +164,7 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-
-    results = []
-    video_results = []
+    results, video_results = [], []
     bar = st.progress(0)
 
     for i, f in enumerate(files):
@@ -211,7 +184,7 @@ if process and files:
             png_to_pdf([path], out)
             results.append(out)
 
-        elif mode == "PNG → Remove Background" and ext in [".png",".jpg",".jpeg"]:
+        elif mode == "PNG → Remove Background":
             out = f"output/no_bg_{f.name}.png"
             remove_bg_img(path, out)
             results.append(out)
@@ -253,81 +226,21 @@ if process and files:
 
         bar.progress((i + 1) / len(files))
 
-    # ZIP NON VIDEO
     if results:
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
-
         st.success("🎉 Proses Dokumen & Gambar Selesai")
-        st.download_button(
-            "📦 Download ZIP (Dokumen & Gambar)",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
+        st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
 
-    # DOWNLOAD VIDEO
     if video_results:
-        st.subheader("🎬 Download Video (Tanpa ZIP)")
+        st.subheader("🎬 Download Video")
         for v in video_results:
             with open(v, "rb") as vf:
                 st.download_button(
-                    f"⬇️ Download {os.path.basename(v)}",
+                    f"⬇️ {os.path.basename(v)}",
                     vf,
-                    file_name=os.path.basename(v),
-                    mime="video/mp4"
-                )
-
-    # ================= ZIP (NON VIDEO) =================
-    if results:
-        zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-            for r in results:
-                z.write(r, arcname=os.path.basename(r))
-
-        st.success("🎉 Proses Dokumen & Gambar Selesai")
-        st.download_button(
-            "📦 Download ZIP (Dokumen & Gambar)",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
-
-    # ================= DOWNLOAD VIDEO =================
-    if video_results:
-        st.subheader("🎬 Download Video (Tanpa ZIP)")
-        for v in video_results:
-            with open(v, "rb") as vf:
-                st.download_button(
-                    f"⬇️ Download {os.path.basename(v)}",
-                    vf,
-                    file_name=os.path.basename(v),
-                    mime="video/mp4"
-                )
-
-    # ================= ZIP (NON VIDEO) =================
-    if results:
-        zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path, "w") as z:
-            for r in results:
-                z.write(r, arcname=os.path.basename(r))
-
-        st.success("🎉 Proses Dokumen Selesai")
-        st.download_button(
-            "📦 Download ZIP (Dokumen & Gambar)",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
-
-    # ================= DOWNLOAD VIDEO =================
-    if video_results:
-        st.subheader("🎬 Download Video (Tanpa ZIP)")
-
-        for v in video_results:
-            with open(v, "rb") as vf:
-                st.download_button(
-                    label=f"⬇️ Download {os.path.basename(v)}",
-                    data=vf,
                     file_name=os.path.basename(v),
                     mime="video/mp4"
                 )
