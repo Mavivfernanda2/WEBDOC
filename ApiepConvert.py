@@ -11,10 +11,16 @@ from moviepy.editor import VideoFileClip
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
 
+# ================= SESSION STATE INIT =================
+if "results" not in st.session_state:
+    st.session_state.results = []
+
+if "videos" not in st.session_state:
+    st.session_state.videos = []
+
 # ================= HEADER =================
-col1, col2 = st.columns([4,1])
-with col1:
-    st.markdown("## 🧰 Apiep Doc Converter\nKonversi Dokumen & Video Serba Praktis 🚀")
+st.markdown("## 🧰 Apiep Doc Converter\nKonversi Dokumen & Video Serba Praktis 🚀")
+
 # ================= HELPERS =================
 def save_temp(file):
     path = f"temp_{file.name}"
@@ -30,20 +36,19 @@ def safe_add_to_zip(zipf, filepath):
 def pdf_to_png(pdf, out_dir, dpi):
     zoom = dpi / 72
     doc = fitz.open(pdf)
-    res = []
+    results = []
     for i, page in enumerate(doc):
         pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
         out = f"{out_dir}/page_{i+1}.png"
         pix.save(out)
-        res.append(out)
+        results.append(out)
     doc.close()
-    return res
+    return results
 
 def preview_pdf_first_page(pdf_path, dpi=120):
     doc = fitz.open(pdf_path)
     page = doc.load_page(0)
-    mat = fitz.Matrix(dpi/72, dpi/72)
-    pix = page.get_pixmap(matrix=mat)
+    pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72))
     img_path = pdf_path.replace(".pdf", "_preview.png")
     pix.save(img_path)
     doc.close()
@@ -66,7 +71,7 @@ def word_to_pdf(docx, out):
     )
     base = os.path.splitext(os.path.basename(docx))[0]
     generated = os.path.join(out_dir, f"{base}.pdf")
-    if generated != out:
+    if generated != out and os.path.exists(generated):
         os.rename(generated, out)
 
 def excel_to_pdf(xlsx, out):
@@ -86,6 +91,7 @@ def excel_to_pdf(xlsx, out):
 
 def video_to_mp4(video, out, res):
     clip = VideoFileClip(video)
+
     if res == "480p":
         clip = clip.resize(height=480)
     elif res == "720p":
@@ -109,7 +115,10 @@ def jpg_to_png(img, out):
 def png_to_jpg(img, out):
     im = Image.open(img)
     bg = Image.new("RGB", im.size, (255,255,255))
-    bg.paste(im, mask=im.split()[3] if im.mode=="RGBA" else None)
+    if im.mode == "RGBA":
+        bg.paste(im, mask=im.split()[3])
+    else:
+        bg.paste(im)
     bg.save(out, "JPEG", quality=85)
 
 # ================= UI =================
@@ -135,8 +144,8 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    st.session_state.results = []
-    st.session_state.videos = []
+    st.session_state.results.clear()
+    st.session_state.videos.clear()
 
     for f in files:
         path = save_temp(f)
@@ -191,20 +200,23 @@ if pdfs:
     for pdf in pdfs:
         img = preview_pdf_first_page(pdf)
         st.image(img, use_container_width=True)
-        st.download_button("⬇️ Download PDF", open(pdf,"rb"), file_name=os.path.basename(pdf))
+        with open(pdf,"rb") as f:
+            st.download_button("⬇️ Download PDF", f, file_name=os.path.basename(pdf))
 
-# ================= DOWNLOAD FILE =================
+# ================= DOWNLOAD ZIP =================
 if st.session_state.results:
     zip_path="HASIL_KONVERSI.zip"
-    with zipfile.ZipFile(zip_path,"w") as z:
+    with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
         for r in st.session_state.results:
             safe_add_to_zip(z,r)
 
-    st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
+    with open(zip_path,"rb") as f:
+        st.download_button("📦 Download ZIP", f, file_name=zip_path)
 
 # ================= VIDEO =================
 if st.session_state.videos:
     st.subheader("🎬 Preview & Download Video")
     for v in st.session_state.videos:
         st.video(v)
-        st.download_button("⬇️ Download MP4", open(v,"rb"), file_name=os.path.basename(v))
+        with open(v,"rb") as f:
+            st.download_button("⬇️ Download MP4", f, file_name=os.path.basename(v))
