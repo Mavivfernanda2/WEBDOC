@@ -111,10 +111,17 @@ def video_to_mp4(video_path, out_path, resolution):
         clip = clip.resize(height=720)
     elif resolution == "1080p":
         clip = clip.resize(height=1080)
-    elif resolution == "2K":
-        clip = clip.resize(height=1440)
-    elif resolution == "4K":
-        clip = clip.resize(height=2160)
+    # Original = tidak resize
+
+    clip.write_videofile(
+        out_path,
+        codec="libx264",
+        audio_codec="aac",
+        threads=2,
+        preset="ultrafast"
+    )
+    clip.close()
+
 
     clip.write_videofile(out_path, codec="libx264", audio_codec="aac")
     clip.close()
@@ -179,6 +186,12 @@ if process and files:
     for i, f in enumerate(files):
         path = save_temp(f)
         ext = os.path.splitext(f.name.lower())[1]
+        
+# 🔒 Batasi ukuran video (300 MB)
+if ext in [".mov", ".avi"] and f.size > 300 * 1024 * 1024:
+    st.error(f"❌ Video {f.name} terlalu besar (maks 300 MB)")
+    bar.progress((i + 1) / len(files))
+    continue
 
         if mode == "PDF → PNG" and ext == ".pdf":
             results.extend(pdf_to_png(path, "output", dpi))
