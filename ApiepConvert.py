@@ -46,12 +46,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================= HEADER =================
-st.markdown("""
 <div class="header">
 <h1>🧰 Apiep Doc Converter</h1>
 <p>Convert • Preview • Download • Simple & Powerful</p>
 </div>
-""", unsafe_allow_html=True)
 
 # ================= SESSION =================
 if "results" not in st.session_state:
