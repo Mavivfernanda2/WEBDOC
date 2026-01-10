@@ -1,7 +1,6 @@
 import streamlit as st
-import os, zipfile
+import os, zipfile, subprocess
 import fitz
-import subprocess
 from PIL import Image
 import pandas as pd
 from pdf2docx import Converter
@@ -20,7 +19,7 @@ if "logged_in" not in st.session_state:
     st.session_state.user = ""
 
 def login_page():
-    st.subheader("Selamat Datang")
+    st.subheader("🔐 Login")
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
@@ -29,7 +28,7 @@ def login_page():
             st.session_state.user = u
             st.rerun()
         else:
-            st.error("❌ Username atau Password salah")
+            st.error("❌ Username / Password salah")
 
 if not st.session_state.logged_in:
     login_page()
@@ -41,8 +40,7 @@ with col1:
     st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
 with col2:
     if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
-        st.session_state.user = ""
+        st.session_state.clear()
         st.rerun()
 
 # ================= HELPERS =================
@@ -52,6 +50,11 @@ def save_temp(file):
         f.write(file.read())
     return path
 
+def safe_add_to_zip(zipf, filepath):
+    if filepath and os.path.exists(filepath):
+        zipf.write(filepath, arcname=os.path.basename(filepath))
+
+# ================= CONVERTERS =================
 def pdf_to_png(pdf, out_dir, dpi):
     zoom = dpi / 72
     doc = fitz.open(pdf)
@@ -73,23 +76,18 @@ def pdf_to_word(pdf, out):
     c.close()
 
 def word_to_pdf(docx, out):
-    output_dir = os.path.dirname(out)
+    out_dir = os.path.dirname(out)
 
-    try:
-        subprocess.run(
-            [
-                "libreoffice",
-                "--headless",
-                "--convert-to",
-                "pdf",
-                docx,
-                "--outdir",
-                output_dir
-            ],
-            check=True
-        )
-    except FileNotFoundError:
-        raise RuntimeError("LibreOffice tidak ditemukan. Gunakan Docker atau server dengan LibreOffice.")
+    subprocess.run(
+        ["libreoffice", "--headless", "--convert-to", "pdf", docx, "--outdir", out_dir],
+        check=True
+    )
+
+    base = os.path.splitext(os.path.basename(docx))[0]
+    generated = os.path.join(out_dir, f"{base}.pdf")
+
+    if os.path.exists(generated) and generated != out:
+        os.rename(generated, out)
 
 def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
@@ -106,33 +104,37 @@ def excel_to_pdf(xlsx, out):
             y = A4[1] - 40
     c.save()
 
-def video_to_mp4(video_path, out_path, resolution):
-    clip = VideoFileClip(video_path)
+def video_to_mp4(video, out, res):
+    clip = VideoFileClip(video)
 
-    if resolution == "480p":
+    if res == "480p":
         clip = clip.resize(height=480)
-    elif resolution == "720p":
+    elif res == "720p":
         clip = clip.resize(height=720)
-    elif resolution == "1080p":
+    elif res == "1080p":
         clip = clip.resize(height=1080)
 
     clip.write_videofile(
-        out_path,
+        out,
         codec="libx264",
         audio_codec="aac",
         preset="ultrafast",
-        threads=2
+        threads=2,
+        logger=None
     )
     clip.close()
 
 def jpg_to_png(img, out):
-    Image.open(img).convert("RGBA").save(out, format="PNG")
+    Image.open(img).convert("RGBA").save(out, "PNG")
 
-def png_to_jpg(img, out, quality=85):
+def png_to_jpg(img, out):
     im = Image.open(img)
     bg = Image.new("RGB", im.size, (255,255,255))
-    bg.paste(im, mask=im.split()[3] if im.mode=="RGBA" else None)
-    bg.save(out, "JPEG", quality=quality)
+    if im.mode == "RGBA":
+        bg.paste(im, mask=im.split()[3])
+    else:
+        bg.paste(im)
+    bg.save(out, "JPEG", quality=85)
 
 # ================= UI =================
 mode = st.selectbox("📂 Mode Konversi", [
@@ -148,10 +150,10 @@ mode = st.selectbox("📂 Mode Konversi", [
 ])
 
 video_res = "Original"
-if mode in ["MOV → MP4", "AVI → MP4"]:
-    video_res = st.selectbox("🎥 Resolusi Video", ["Original", "480p", "720p", "1080p"])
+if "MP4" in mode:
+    video_res = st.selectbox("🎥 Resolusi Video", ["Original","480p","720p","1080p"])
 
-dpi = st.selectbox("Resolusi DPI", [150,200,300,600])
+dpi = st.selectbox("🖼️ Resolusi DPI", [150,200,300,600])
 
 files = st.file_uploader(
     "📤 Upload File",
@@ -164,73 +166,71 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    results, video_results = [], []
+    results, videos = [], []
     bar = st.progress(0)
 
     for i, f in enumerate(files):
         path = save_temp(f)
         ext = os.path.splitext(f.name.lower())[1]
 
-        if ext in [".mov",".avi"] and f.size > 300 * 1024 * 1024:
-            st.error(f"❌ {f.name} terlalu besar (maks 300MB)")
-            continue
+        try:
+            if mode == "PDF → PNG" and ext == ".pdf":
+                results.extend(pdf_to_png(path, "output", dpi))
 
-        if mode == "PDF → PNG" and ext == ".pdf":
-            results.extend(pdf_to_png(path, "output", dpi))
+            elif mode == "PDF → Word" and ext == ".pdf":
+                out = f"output/{f.name.replace('.pdf','.docx')}"
+                pdf_to_word(path, out)
+                results.append(out)
 
-        elif mode == "PDF → Word" and ext == ".pdf":
-            out = f"output/{f.name.replace('.pdf','.docx')}"
-            pdf_to_word(path, out)
-            results.append(out)
+            elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
+                out = f"output/{os.path.splitext(f.name)[0]}.pdf"
+                png_to_pdf([path], out)
+                results.append(out)
 
-        elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
-            out = f"output/{f.name}.pdf"
-            png_to_pdf([path], out)
-            results.append(out)
+            elif mode == "Word → PDF" and ext == ".docx":
+                out = f"output/{f.name.replace('.docx','.pdf')}"
+                word_to_pdf(path, out)
+                results.append(out)
 
-        elif mode == "JPG → PNG" and ext in [".jpg",".jpeg"]:
-            out = f"output/{os.path.splitext(f.name)[0]}.png"
-            jpg_to_png(path, out)
-            results.append(out)
+            elif mode == "Excel → PDF" and ext == ".xlsx":
+                out = f"output/{f.name.replace('.xlsx','.pdf')}"
+                excel_to_pdf(path, out)
+                results.append(out)
 
-        elif mode == "PNG → JPG" and ext == ".png":
-            out = f"output/{os.path.splitext(f.name)[0]}.jpg"
-            png_to_jpg(path, out)
-            results.append(out)
+            elif mode == "JPG → PNG" and ext in [".jpg",".jpeg"]:
+                out = f"output/{os.path.splitext(f.name)[0]}.png"
+                jpg_to_png(path, out)
+                results.append(out)
 
-        elif mode == "Word → PDF" and ext == ".docx":
-            out = f"output/{f.name.replace('.docx','.pdf')}"
-            word_to_pdf(path, out)
-            results.append(out)
+            elif mode == "PNG → JPG" and ext == ".png":
+                out = f"output/{os.path.splitext(f.name)[0]}.jpg"
+                png_to_jpg(path, out)
+                results.append(out)
 
-        elif mode == "Excel → PDF" and ext == ".xlsx":
-            out = f"output/{f.name.replace('.xlsx','.pdf')}"
-            excel_to_pdf(path, out)
-            results.append(out)
+            elif mode in ["MOV → MP4","AVI → MP4"] and ext in [".mov",".avi"]:
+                out = f"output/{os.path.splitext(f.name)[0]}.mp4"
+                video_to_mp4(path, out, video_res)
+                videos.append(out)
 
-        elif mode == "MOV → MP4" and ext == ".mov":
-            out = f"output/{f.name.replace('.mov','.mp4')}"
-            video_to_mp4(path, out, video_res)
-            video_results.append(out)
-
-        elif mode == "AVI → MP4" and ext == ".avi":
-            out = f"output/{f.name.replace('.avi','.mp4')}"
-            video_to_mp4(path, out, video_res)
-            video_results.append(out)
+        except Exception as e:
+            st.warning(f"⚠️ Gagal: {f.name} ({e})")
 
         bar.progress((i+1)/len(files))
 
+    # ZIP dokumen & gambar
     if results:
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
             for r in results:
-                z.write(r, arcname=os.path.basename(r))
-        st.success("🎉 Proses Dokumen & Gambar Selesai")
+                safe_add_to_zip(z, r)
+
+        st.success("✅ Konversi Dokumen & Gambar Selesai")
         st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
 
-    if video_results:
+    # Video download
+    if videos:
         st.subheader("🎬 Download Video")
-        for v in video_results:
+        for v in videos:
             st.download_button(
                 f"⬇️ {os.path.basename(v)}",
                 open(v,"rb"),
