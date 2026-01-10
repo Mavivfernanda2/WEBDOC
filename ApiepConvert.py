@@ -1,10 +1,10 @@
 import streamlit as st
 import os, zipfile
 import fitz
+import subprocess
 from PIL import Image
 import pandas as pd
 from pdf2docx import Converter
-from docx2pdf import convert
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from moviepy.editor import VideoFileClip
