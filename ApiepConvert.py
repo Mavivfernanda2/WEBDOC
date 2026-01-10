@@ -7,7 +7,6 @@ from pdf2docx import Converter
 from docx2pdf import convert
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from rembg import remove
 from moviepy.editor import VideoFileClip
 
 # ================= PAGE CONFIG =================
@@ -35,7 +34,7 @@ def login_page():
 if not st.session_state.logged_in:
     login_page()
     st.stop()
-    
+
 st.info("⏳ Aplikasi sedang disiapkan, mohon tunggu...")
 
 # ================= HEADER =================
@@ -70,9 +69,6 @@ def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
     imgs[0].save(out_pdf, save_all=True, append_images=imgs[1:])
 
-def remove_bg_img(img, out):
-    remove(Image.open(img).convert("RGBA")).save(out, format="PNG")
-
 def pdf_to_word(pdf, out):
     c = Converter(pdf)
     c.convert(out)
@@ -97,28 +93,23 @@ def excel_to_pdf(xlsx, out):
     c.save()
 
 def video_to_mp4(video_path, out_path, resolution):
-    try:
-        clip = VideoFileClip(video_path)
+    clip = VideoFileClip(video_path)
 
-        if resolution == "480p":
-            clip = clip.resize(height=480)
-        elif resolution == "720p":
-            clip = clip.resize(height=720)
-        elif resolution == "1080p":
-            clip = clip.resize(height=1080)
+    if resolution == "480p":
+        clip = clip.resize(height=480)
+    elif resolution == "720p":
+        clip = clip.resize(height=720)
+    elif resolution == "1080p":
+        clip = clip.resize(height=1080)
 
-        clip.write_videofile(
-            out_path,
-            codec="libx264",
-            audio_codec="aac",
-            preset="ultrafast",
-            threads=2
-        )
-        clip.close()
-        return True
-    except Exception as e:
-        st.error(f"❌ Gagal konversi video: {e}")
-        return False
+    clip.write_videofile(
+        out_path,
+        codec="libx264",
+        audio_codec="aac",
+        preset="ultrafast",
+        threads=2
+    )
+    clip.close()
 
 def jpg_to_png(img, out):
     Image.open(img).convert("RGBA").save(out, format="PNG")
@@ -134,7 +125,6 @@ mode = st.selectbox("📂 Mode Konversi", [
     "PDF → PNG",
     "PDF → Word",
     "PNG → PDF",
-    "PNG → Remove Background",
     "Word → PDF",
     "Excel → PDF",
     "JPG → PNG",
@@ -184,11 +174,6 @@ if process and files:
             png_to_pdf([path], out)
             results.append(out)
 
-        elif mode == "PNG → Remove Background":
-            out = f"output/no_bg_{f.name}.png"
-            remove_bg_img(path, out)
-            results.append(out)
-
         elif mode == "JPG → PNG" and ext in [".jpg",".jpeg"]:
             out = f"output/{os.path.splitext(f.name)[0]}.png"
             jpg_to_png(path, out)
@@ -211,13 +196,13 @@ if process and files:
 
         elif mode == "MOV → MP4" and ext == ".mov":
             out = f"output/{f.name.replace('.mov','.mp4')}"
-            if video_to_mp4(path, out, video_res):
-                video_results.append(out)
+            video_to_mp4(path, out, video_res)
+            video_results.append(out)
 
         elif mode == "AVI → MP4" and ext == ".avi":
             out = f"output/{f.name.replace('.avi','.mp4')}"
-            if video_to_mp4(path, out, video_res):
-                video_results.append(out)
+            video_to_mp4(path, out, video_res)
+            video_results.append(out)
 
         bar.progress((i+1)/len(files))
 
@@ -226,7 +211,7 @@ if process and files:
         with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
-        st.success("🎉 Proses Selesai")
+        st.success("🎉 Proses Dokumen & Gambar Selesai")
         st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
 
     if video_results:
