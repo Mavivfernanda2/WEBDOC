@@ -13,14 +13,13 @@ from moviepy.editor import VideoFileClip
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
 
-# ================= AUTH CONFIG =================
+# ================= AUTH =================
 USERS = {"guru": "apiep123", "admin": "admin123"}
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = ""
 
-# ================= LOGIN =================
 def login_page():
     st.subheader("Selamat Datang")
     u = st.text_input("Username")
@@ -38,16 +37,9 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ================= HEADER =================
-col1, col2 = st.columns([4, 1])
-
+col1, col2 = st.columns([4,1])
 with col1:
-    st.markdown(f"""
-    <div style="color:white">
-    <h1>🧰 Apiep Doc Converter</h1>
-    <p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
 with col2:
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
@@ -103,47 +95,37 @@ def excel_to_pdf(xlsx, out):
     c.save()
 
 def video_to_mp4(video_path, out_path, resolution):
-    clip = VideoFileClip(video_path)
+    try:
+        clip = VideoFileClip(video_path)
 
-    if resolution == "480p":
-        clip = clip.resize(height=480)
-    elif resolution == "720p":
-        clip = clip.resize(height=720)
-    elif resolution == "1080p":
-        clip = clip.resize(height=1080)
-    # Original = tidak resize
+        if resolution == "480p":
+            clip = clip.resize(height=480)
+        elif resolution == "720p":
+            clip = clip.resize(height=720)
+        elif resolution == "1080p":
+            clip = clip.resize(height=1080)
 
-    clip.write_videofile(
-        out_path,
-        codec="libx264",
-        audio_codec="aac",
-        threads=2,
-        preset="ultrafast"
-    )
-    clip.close()
-
-
-    clip.write_videofile(out_path, codec="libx264", audio_codec="aac")
-    clip.close()
+        clip.write_videofile(
+            out_path,
+            codec="libx264",
+            audio_codec="aac",
+            preset="ultrafast",
+            threads=2
+        )
+        clip.close()
+        return True
+    except Exception as e:
+        st.error(f"❌ Gagal konversi video: {e}")
+        return False
 
 def jpg_to_png(img, out):
     Image.open(img).convert("RGBA").save(out, format="PNG")
 
 def png_to_jpg(img, out, quality=85):
     im = Image.open(img)
-    bg = Image.new("RGB", im.size, (255, 255, 255))
-    bg.paste(im, mask=im.split()[3] if im.mode == "RGBA" else None)
-    bg.save(out, format="JPEG", quality=quality)
-
-def rar_to_zip(rar_path, zip_path):
-    temp_dir = "temp_rar"
-    os.makedirs(temp_dir, exist_ok=True)
-    os.system(f'unrar x "{rar_path}" "{temp_dir}"')
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        for root, _, files in os.walk(temp_dir):
-            for f in files:
-                full = os.path.join(root, f)
-                z.write(full, arcname=os.path.relpath(full, temp_dir))
+    bg = Image.new("RGB", im.size, (255,255,255))
+    bg.paste(im, mask=im.split()[3] if im.mode=="RGBA" else None)
+    bg.save(out, "JPEG", quality=quality)
 
 # ================= UI =================
 mode = st.selectbox("📂 Mode Konversi", [
@@ -155,24 +137,20 @@ mode = st.selectbox("📂 Mode Konversi", [
     "Excel → PDF",
     "JPG → PNG",
     "PNG → JPG",
-    "RAR → ZIP",
     "MOV → MP4",
     "AVI → MP4"
 ])
 
 video_res = "Original"
 if mode in ["MOV → MP4", "AVI → MP4"]:
-    video_res = st.selectbox(
-        "🎥 Resolusi Video",
-        ["Original", "480p", "720p", "1080p", "2K", "4K"]
-    )
+    video_res = st.selectbox("🎥 Resolusi Video", ["Original", "480p", "720p", "1080p"])
 
-dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
+dpi = st.selectbox("Resolusi DPI", [150,200,300,600])
 
 files = st.file_uploader(
     "📤 Upload File",
     accept_multiple_files=True,
-    type=["pdf","png","jpg","jpeg","docx","xlsx","mov","avi","rar"]
+    type=["pdf","png","jpg","jpeg","docx","xlsx","mov","avi"]
 )
 
 process = st.button("🚀 PROSES")
@@ -186,12 +164,10 @@ if process and files:
     for i, f in enumerate(files):
         path = save_temp(f)
         ext = os.path.splitext(f.name.lower())[1]
-        
-# 🔒 Batasi ukuran video (300 MB)
-if ext in [".mov", ".avi"] and f.size > 300 * 1024 * 1024:
-    st.error(f"❌ Video {f.name} terlalu besar (maks 300 MB)")
-    bar.progress((i + 1) / len(files))
-    continue
+
+        if ext in [".mov",".avi"] and f.size > 300 * 1024 * 1024:
+            st.error(f"❌ {f.name} terlalu besar (maks 300MB)")
+            continue
 
         if mode == "PDF → PNG" and ext == ".pdf":
             results.extend(pdf_to_png(path, "output", dpi))
@@ -233,36 +209,30 @@ if ext in [".mov", ".avi"] and f.size > 300 * 1024 * 1024:
 
         elif mode == "MOV → MP4" and ext == ".mov":
             out = f"output/{f.name.replace('.mov','.mp4')}"
-            video_to_mp4(path, out, video_res)
-            video_results.append(out)
+            if video_to_mp4(path, out, video_res):
+                video_results.append(out)
 
         elif mode == "AVI → MP4" and ext == ".avi":
             out = f"output/{f.name.replace('.avi','.mp4')}"
-            video_to_mp4(path, out, video_res)
-            video_results.append(out)
+            if video_to_mp4(path, out, video_res):
+                video_results.append(out)
 
-        elif mode == "RAR → ZIP" and ext == ".rar":
-            out = f"output/{os.path.splitext(f.name)[0]}.zip"
-            rar_to_zip(path, out)
-            results.append(out)
-
-        bar.progress((i + 1) / len(files))
+        bar.progress((i+1)/len(files))
 
     if results:
         zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
-        st.success("🎉 Proses Dokumen & Gambar Selesai")
-        st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
+        st.success("🎉 Proses Selesai")
+        st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
 
     if video_results:
         st.subheader("🎬 Download Video")
         for v in video_results:
-            with open(v, "rb") as vf:
-                st.download_button(
-                    f"⬇️ {os.path.basename(v)}",
-                    vf,
-                    file_name=os.path.basename(v),
-                    mime="video/mp4"
-                )
+            st.download_button(
+                f"⬇️ {os.path.basename(v)}",
+                open(v,"rb"),
+                file_name=os.path.basename(v),
+                mime="video/mp4"
+            )
