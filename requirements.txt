@@ -6,3 +6,4 @@ pdf2docx
 reportlab
 rembg
 moviepy
+openpyxl
