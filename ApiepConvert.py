@@ -14,8 +14,7 @@ st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
 # ================= HEADER =================
 col1, col2 = st.columns([4,1])
 with col1:
-    st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai *{st.session_state.user.upper()}*")
-with col2:
+    st.markdown("## 🧰 Apiep Doc Converter\nKonversi Dokumen & Video Serba Praktis 🚀")
 # ================= HELPERS =================
 def save_temp(file):
     path = f"temp_{file.name}"
