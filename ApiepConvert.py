@@ -18,10 +18,6 @@ st.set_page_config(
 # ================= UI STYLE =================
 st.markdown("""
 <style>
-body {
-  background: radial-gradient(circle at top, #0f2027, #000);
-}
-
 .glass {
   background: rgba(255,255,255,0.08);
   backdrop-filter: blur(16px);
@@ -32,22 +28,15 @@ body {
   box-shadow: 0 8px 32px rgba(0,0,0,0.35);
   margin-bottom: 18px;
 }
-
 .header {
   background: linear-gradient(270deg,#00c6ff,#0072ff,#00ffd5);
   background-size: 600% 600%;
   animation: gradient 8s ease infinite;
-  padding: 26px;
-  border-radius: 28px;
+  padding: 24px;
+  border-radius: 26px;
   color: white;
-  text-align: center;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  text-align:center;
 }
-
-.header h1 {
-  margin-bottom: 6px;
-}
-
 @keyframes gradient {
   0% {background-position:0% 50%}
   50% {background-position:100% 50%}
@@ -59,8 +48,8 @@ body {
 # ================= HEADER =================
 st.markdown("""
 <div class="header">
-  <h1>🧰 Apiep Doc Converter</h1>
-  <p>Convert • Preview • Download • Simple & Powerful</p>
+<h1>🧰 Apiep Doc Converter</h1>
+<p>Convert • Preview • Download • Simple & Powerful</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -154,11 +143,15 @@ def png_to_jpg(img,out):
     bg.save(out,"JPEG",quality=85)
 
 # ================= UI =================
-st.markdown('<div class="glass">', unsafe_allow_html=True)
+st.markdown('<div class="glass">',unsafe_allow_html=True)
 
-mode = st.selectbox("⚙️ Mode Konversi", [...])
-files = st.file_uploader("📤 Upload File", accept_multiple_files=True)
-advanced = st.toggle("🎛 Advanced Mode")
+mode=st.selectbox("⚙️ Mode Konversi",[
+    "PDF → PNG","PDF → Word","PNG → PDF","Word → PDF",
+    "Excel → PDF","JPG → PNG","PNG → JPG","MOV → MP4","AVI → MP4"
+])
+
+files=st.file_uploader("📤 Upload File",accept_multiple_files=True)
+advanced=st.toggle("🎛 Advanced Mode")
 
 if advanced:
     dpi=st.selectbox("🖼 DPI", [150,200,300,600])
@@ -167,7 +160,7 @@ else:
     dpi=150
     video_res="Original"
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>',unsafe_allow_html=True)
 
 # ================= PROCESS =================
 if st.button("🚀 PROSES") and files:
