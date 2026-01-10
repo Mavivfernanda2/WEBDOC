@@ -10,45 +10,6 @@ from moviepy.editor import VideoFileClip
 
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
-
-# ================= AUTH =================
-USERS = {"guru": "apiep123", "admin": "admin123"}
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user = ""
-
-if "results" not in st.session_state:
-    st.session_state.results = []
-
-if "videos" not in st.session_state:
-    st.session_state.videos = []
-
-def login_page():
-    st.subheader("🔐 Login")
-    u = st.text_input("Username")
-    p = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if u in USERS and USERS[u] == p:
-            st.session_state.logged_in = True
-            st.session_state.user = u
-            st.rerun()
-        else:
-            st.error("❌ Username / Password salah")
-
-if not st.session_state.logged_in:
-    login_page()
-    st.stop()
-
-# ================= HEADER =================
-col1, col2 = st.columns([4,1])
-with col1:
-    st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
-with col2:
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
-
 # ================= HELPERS =================
 def save_temp(file):
     path = f"temp_{file.name}"
