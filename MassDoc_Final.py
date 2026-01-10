@@ -8,6 +8,7 @@ from docx2pdf import convert
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from rembg import remove
+from moviepy.editor import VideoFileClip
 
 # ================= PAGE CONFIG =================
 st.set_page_config(
@@ -60,7 +61,6 @@ st.markdown("""
 html, body {
     background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
 }
-
 .glass {
     background: rgba(255,255,255,0.12);
     backdrop-filter: blur(16px);
@@ -69,43 +69,20 @@ html, body {
     box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     margin-bottom: 25px;
 }
-
-h1,h2,h3,label,p {
-    color: white !important;
-}
-
+h1,h2,h3,label,p { color: white !important; }
 .stButton>button {
     background: linear-gradient(90deg,#00c6ff,#0072ff);
-    color:white;
-    border-radius:14px;
-    padding:0.6em 1.4em;
-    font-weight:600;
+    color:white; border-radius:14px;
+    padding:0.6em 1.4em; font-weight:600;
 }
-
-/* File uploader */
 [data-testid="stFileUploader"] {
     border:2px dashed rgba(255,255,255,0.4);
-    border-radius:20px;
-    padding:25px;
+    border-radius:20px; padding:25px;
     background:rgba(255,255,255,0.05);
-}
-
-/* Logout fixed top-right */
-div[data-testid="column"]:has(button[key="logout"]) {
-    position: fixed;
-    top: 18px;
-    right: 20px;
-    z-index: 9999;
-}
-
-button[key="logout"] {
-    background: linear-gradient(90deg,#ff416c,#ff4b2b) !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= LOGOUT RENDER =================
 logout_button()
 
 # ================= HEADER =================
@@ -147,16 +124,6 @@ def watermark_img(img_path, text):
     draw.text((20, img.height-40), text, fill=(180,180,180,120))
     img.save(img_path)
 
-def preview_images(imgs):
-    cols = st.columns(3)
-    for i, img in enumerate(imgs):
-        with cols[i % 3]:
-            st.image(img, use_container_width=True)
-
-def preview_pdf(path):
-    with open(path, "rb") as f:
-        st.download_button("📄 Download PDF", f, file_name=os.path.basename(path))
-
 def pdf_to_word(pdf, out):
     c = Converter(pdf)
     c.convert(out)
@@ -169,7 +136,6 @@ def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
     c = canvas.Canvas(out, pagesize=A4)
     y = A4[1] - 40
-
     for _, row in df.iterrows():
         x = 40
         for cell in row:
@@ -179,36 +145,33 @@ def excel_to_pdf(xlsx, out):
         if y < 40:
             c.showPage()
             y = A4[1] - 40
-
     c.save()
+
+# 🔥 MOV → MP4
+def mov_to_mp4(mov, out):
+    clip = VideoFileClip(mov)
+    clip.write_videofile(out, codec="libx264", audio_codec="aac")
+    clip.close()
 
 # ================= UI =================
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 
-# 🔼 MODE KONVERSI DI ATAS
 mode = st.selectbox("📂 Mode Konversi", [
     "PDF → PNG",
     "PDF → Word",
     "PNG → PDF",
     "PNG → Remove Background",
     "Word → PDF",
-    "Excel → PDF"
+    "Excel → PDF",
+    "MOV → MP4"
 ])
 
 dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
-school_mode = st.toggle("🏫 Mode Sekolah")
-
-if school_mode:
-    school = st.text_input("Nama Sekolah")
-    year = st.text_input("Tahun Ajaran", "2024/2025")
-    watermark = f"{school} — {st.session_state.user.upper()} — {year}"
-else:
-    watermark = st.text_input("Watermark (opsional)")
 
 files = st.file_uploader(
     "📤 Drag & Drop File",
     accept_multiple_files=True,
-    type=["pdf","png","jpg","jpeg","docx","xlsx"]
+    type=["pdf","png","jpg","jpeg","docx","xlsx","mov"]
 )
 
 process = st.button("🚀 PROSES")
@@ -225,11 +188,7 @@ if process and files:
         ext = os.path.splitext(f.name.lower())[1]
 
         if mode == "PDF → PNG" and ext == ".pdf":
-            imgs = pdf_to_png(path, "output", dpi)
-            if watermark:
-                for img in imgs:
-                    watermark_img(img, watermark)
-            results.extend(imgs)
+            results.extend(pdf_to_png(path, "output", dpi))
 
         elif mode == "PDF → Word" and ext == ".pdf":
             out = f"output/{f.name.replace('.pdf','.docx')}"
@@ -256,11 +215,15 @@ if process and files:
             excel_to_pdf(path, out)
             results.append(out)
 
+        elif mode == "MOV → MP4" and ext == ".mov":
+            out = f"output/{f.name.replace('.mov','.mp4')}"
+            mov_to_mp4(path, out)
+            results.append(out)
+
         bar.progress((i + 1) / len(files))
 
     if results:
-        st.subheader("👀 Preview")
-        preview_images(results) if results[0].endswith(".png") else preview_pdf(results[0])
+        st.success("🎉 Proses Selesai")
 
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path, "w") as z:
@@ -268,4 +231,3 @@ if process and files:
                 z.write(r, arcname=os.path.basename(r))
 
         st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
-        st.success("🎉 Proses Selesai")
