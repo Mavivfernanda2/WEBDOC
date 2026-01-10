@@ -38,12 +38,21 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ================= HEADER =================
-st.markdown(f"""
-<div style="color:white">
-<h1>🧰 Apiep Doc Converter</h1>
-<p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
-</div>
-""", unsafe_allow_html=True)
+col1, col2 = st.columns([4, 1])
+
+with col1:
+    st.markdown(f"""
+    <div style="color:white">
+    <h1>🧰 Apiep Doc Converter</h1>
+    <p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.user = ""
+        st.rerun()
 
 # ================= HELPERS =================
 def save_temp(file):
