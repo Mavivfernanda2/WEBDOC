@@ -73,7 +73,23 @@ def pdf_to_word(pdf, out):
     c.close()
 
 def word_to_pdf(docx, out):
-    convert(docx, out)
+    output_dir = os.path.dirname(out)
+
+    try:
+        subprocess.run(
+            [
+                "libreoffice",
+                "--headless",
+                "--convert-to",
+                "pdf",
+                docx,
+                "--outdir",
+                output_dir
+            ],
+            check=True
+        )
+    except FileNotFoundError:
+        raise RuntimeError("LibreOffice tidak ditemukan. Gunakan Docker atau server dengan LibreOffice.")
 
 def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
