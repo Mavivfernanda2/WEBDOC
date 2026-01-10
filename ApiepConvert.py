@@ -18,6 +18,12 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = ""
 
+if "results" not in st.session_state:
+    st.session_state.results = []
+
+if "videos" not in st.session_state:
+    st.session_state.videos = []
+
 def login_page():
     st.subheader("🔐 Login")
     u = st.text_input("Username")
@@ -35,10 +41,13 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ================= HEADER =================
-st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
-if st.button("🚪 Logout"):
-    st.session_state.clear()
-    st.rerun()
+col1, col2 = st.columns([4,1])
+with col1:
+    st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
+with col2:
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
 # ================= HELPERS =================
 def save_temp(file):
@@ -51,15 +60,6 @@ def safe_add_to_zip(zipf, filepath):
     if filepath and os.path.exists(filepath):
         zipf.write(filepath, arcname=os.path.basename(filepath))
 
-def preview_pdf_first_page(pdf_path, dpi=120):
-    doc = fitz.open(pdf_path)
-    page = doc.load_page(0)
-    pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72))
-    img_path = pdf_path.replace(".pdf", "_preview.png")
-    pix.save(img_path)
-    doc.close()
-    return img_path
-
 # ================= CONVERTERS =================
 def pdf_to_png(pdf, out_dir, dpi):
     zoom = dpi / 72
@@ -70,7 +70,18 @@ def pdf_to_png(pdf, out_dir, dpi):
         out = f"{out_dir}/page_{i+1}.png"
         pix.save(out)
         res.append(out)
+    doc.close()
     return res
+
+def preview_pdf_first_page(pdf_path, dpi=120):
+    doc = fitz.open(pdf_path)
+    page = doc.load_page(0)
+    mat = fitz.Matrix(dpi/72, dpi/72)
+    pix = page.get_pixmap(matrix=mat)
+    img_path = pdf_path.replace(".pdf", "_preview.png")
+    pix.save(img_path)
+    doc.close()
+    return img_path
 
 def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
@@ -82,12 +93,15 @@ def pdf_to_word(pdf, out):
     c.close()
 
 def word_to_pdf(docx, out):
+    out_dir = os.path.dirname(out)
     subprocess.run(
-        ["libreoffice", "--headless", "--convert-to", "pdf", docx, "--outdir", "output"],
+        ["libreoffice", "--headless", "--convert-to", "pdf", docx, "--outdir", out_dir],
         check=True
     )
-    gen = f"output/{os.path.splitext(os.path.basename(docx))[0]}.pdf"
-    os.rename(gen, out)
+    base = os.path.splitext(os.path.basename(docx))[0]
+    generated = os.path.join(out_dir, f"{base}.pdf")
+    if generated != out:
+        os.rename(generated, out)
 
 def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
@@ -106,29 +120,43 @@ def excel_to_pdf(xlsx, out):
 
 def video_to_mp4(video, out, res):
     clip = VideoFileClip(video)
-    if res != "Original":
-        clip = clip.resize(height=int(res.replace("p","")))
-    clip.write_videofile(out, codec="libx264", audio_codec="aac", preset="ultrafast", logger=None)
+    if res == "480p":
+        clip = clip.resize(height=480)
+    elif res == "720p":
+        clip = clip.resize(height=720)
+    elif res == "1080p":
+        clip = clip.resize(height=1080)
+
+    clip.write_videofile(
+        out,
+        codec="libx264",
+        audio_codec="aac",
+        preset="ultrafast",
+        threads=2,
+        logger=None
+    )
     clip.close()
 
 def jpg_to_png(img, out):
-    Image.open(img).convert("RGBA").save(out)
+    Image.open(img).convert("RGBA").save(out, "PNG")
 
 def png_to_jpg(img, out):
-    im = Image.open(img).convert("RGB")
-    im.save(out, "JPEG", quality=85)
+    im = Image.open(img)
+    bg = Image.new("RGB", im.size, (255,255,255))
+    bg.paste(im, mask=im.split()[3] if im.mode=="RGBA" else None)
+    bg.save(out, "JPEG", quality=85)
 
 # ================= UI =================
 mode = st.selectbox("📂 Mode Konversi", [
-    "PDF → PNG","PDF → Word","PNG → PDF","Word → PDF","Excel → PDF",
-    "JPG → PNG","PNG → JPG","MOV → MP4","AVI → MP4"
+    "PDF → PNG","PDF → Word","PNG → PDF","Word → PDF",
+    "Excel → PDF","JPG → PNG","PNG → JPG","MOV → MP4","AVI → MP4"
 ])
 
 video_res = "Original"
 if "MP4" in mode:
     video_res = st.selectbox("🎥 Resolusi Video", ["Original","480p","720p","1080p"])
 
-dpi = st.selectbox("🖼️ DPI (PDF → PNG)", [150,200,300])
+dpi = st.selectbox("🖼️ Resolusi DPI", [150,200,300,600])
 
 files = st.file_uploader(
     "📤 Upload File",
@@ -141,79 +169,76 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    results, videos = [], []
-    bar = st.progress(0)
+    st.session_state.results = []
+    st.session_state.videos = []
 
-    for i, f in enumerate(files):
+    for f in files:
         path = save_temp(f)
         ext = os.path.splitext(f.name.lower())[1]
 
         try:
-            if mode == "PDF → PNG" and ext == ".pdf":
-                results += pdf_to_png(path, "output", dpi)
+            if mode=="PDF → PNG" and ext==".pdf":
+                st.session_state.results += pdf_to_png(path,"output",dpi)
 
-            elif mode == "PDF → Word" and ext == ".pdf":
-                out = f"output/{f.name.replace('.pdf','.docx')}"
-                pdf_to_word(path, out)
-                results.append(out)
+            elif mode=="PDF → Word" and ext==".pdf":
+                out=f"output/{f.name.replace('.pdf','.docx')}"
+                pdf_to_word(path,out)
+                st.session_state.results.append(out)
 
-            elif mode == "PNG → PDF":
-                out = f"output/{os.path.splitext(f.name)[0]}.pdf"
-                png_to_pdf([path], out)
-                results.append(out)
+            elif mode=="PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
+                out=f"output/{os.path.splitext(f.name)[0]}.pdf"
+                png_to_pdf([path],out)
+                st.session_state.results.append(out)
 
-            elif mode == "Word → PDF" and ext == ".docx":
-                out = f"output/{f.name.replace('.docx','.pdf')}"
-                word_to_pdf(path, out)
-                results.append(out)
+            elif mode=="Word → PDF" and ext==".docx":
+                out=f"output/{f.name.replace('.docx','.pdf')}"
+                word_to_pdf(path,out)
+                st.session_state.results.append(out)
 
-            elif mode == "Excel → PDF":
-                out = f"output/{f.name.replace('.xlsx','.pdf')}"
-                excel_to_pdf(path, out)
-                results.append(out)
+            elif mode=="Excel → PDF" and ext==".xlsx":
+                out=f"output/{f.name.replace('.xlsx','.pdf')}"
+                excel_to_pdf(path,out)
+                st.session_state.results.append(out)
 
-            elif mode == "JPG → PNG":
-                out = f"output/{os.path.splitext(f.name)[0]}.png"
-                jpg_to_png(path, out)
-                results.append(out)
+            elif mode=="JPG → PNG" and ext in [".jpg",".jpeg"]:
+                out=f"output/{os.path.splitext(f.name)[0]}.png"
+                jpg_to_png(path,out)
+                st.session_state.results.append(out)
 
-            elif mode == "PNG → JPG":
-                out = f"output/{os.path.splitext(f.name)[0]}.jpg"
-                png_to_jpg(path, out)
-                results.append(out)
+            elif mode=="PNG → JPG" and ext==".png":
+                out=f"output/{os.path.splitext(f.name)[0]}.jpg"
+                png_to_jpg(path,out)
+                st.session_state.results.append(out)
 
-            elif "MP4" in mode:
-                out = f"output/{os.path.splitext(f.name)[0]}.mp4"
-                video_to_mp4(path, out, video_res)
-                videos.append(out)
+            elif mode in ["MOV → MP4","AVI → MP4"] and ext in [".mov",".avi"]:
+                out=f"output/{os.path.splitext(f.name)[0]}.mp4"
+                video_to_mp4(path,out,video_res)
+                st.session_state.videos.append(out)
 
         except Exception as e:
             st.error(f"❌ {f.name} gagal: {e}")
 
-        bar.progress((i+1)/len(files))
-
 # ================= PREVIEW PDF =================
-if results:
-    pdfs = [r for r in results if r.endswith(".pdf")]
-    if pdfs:
-        st.subheader("📄 Preview PDF (Halaman 1)")
-        for pdf in pdfs:
-            img = preview_pdf_first_page(pdf)
-            st.image(img, use_container_width=True)
-            st.download_button("⬇️ Download PDF", open(pdf,"rb"), file_name=os.path.basename(pdf))
+pdfs = [r for r in st.session_state.results if r.endswith(".pdf")]
+if pdfs:
+    st.subheader("📄 Preview PDF (Halaman 1)")
+    for pdf in pdfs:
+        img = preview_pdf_first_page(pdf)
+        st.image(img, use_container_width=True)
+        st.download_button("⬇️ Download PDF", open(pdf,"rb"), file_name=os.path.basename(pdf))
 
 # ================= DOWNLOAD FILE =================
-if results:
-    zip_path = "HASIL_KONVERSI.zip"
+if st.session_state.results:
+    zip_path="HASIL_KONVERSI.zip"
     with zipfile.ZipFile(zip_path,"w") as z:
-        for r in results:
-            safe_add_to_zip(z, r)
+        for r in st.session_state.results:
+            safe_add_to_zip(z,r)
 
     st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
 
 # ================= VIDEO =================
-if videos:
+if st.session_state.videos:
     st.subheader("🎬 Preview & Download Video")
-    for v in videos:
+    for v in st.session_state.videos:
         st.video(v)
         st.download_button("⬇️ Download MP4", open(v,"rb"), file_name=os.path.basename(v))
