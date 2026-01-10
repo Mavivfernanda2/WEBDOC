@@ -66,6 +66,41 @@ def pdf_to_png(pdf, out_dir, dpi):
         res.append(out)
     return res
 
+def preview_pdf_first_page(pdf_path, dpi=120):
+    try:
+        doc = fitz.open(pdf_path)
+        page = doc.load_page(0)  # halaman pertama
+        mat = fitz.Matrix(dpi/72, dpi/72)
+        pix = page.get_pixmap(matrix=mat)
+        img_path = pdf_path.replace(".pdf", "_preview.png")
+        pix.save(img_path)
+        doc.close()
+        return img_path
+    except Exception as e:
+        st.error(f"Gagal preview PDF: {e}")
+        return None
+
+# ================= PREVIEW PDF =================
+pdf_files = [r for r in results if r.endswith(".pdf")]
+
+if pdf_files:
+    st.subheader("📄 Preview PDF")
+    for pdf in pdf_files:
+        if os.path.exists(pdf):
+            st.markdown(f"**{os.path.basename(pdf)}**")
+            st.pdf(pdf)
+
+def preview_pdf(path):
+    with open(path, "rb") as f:
+        base64_pdf = f.read()
+    st.download_button(
+        "⬇️ Download PDF",
+        base64_pdf,
+        file_name=os.path.basename(path),
+        mime="application/pdf"
+    )
+    st.pdf(path)
+
 def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
     imgs[0].save(out_pdf, save_all=True, append_images=imgs[1:])
@@ -166,7 +201,8 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    results, videos = [], []
+    results = []
+    videos = []
     bar = st.progress(0)
 
     for i, f in enumerate(files):
@@ -207,33 +243,77 @@ if process and files:
                 png_to_jpg(path, out)
                 results.append(out)
 
-            elif mode in ["MOV → MP4","AVI → MP4"] and ext in [".mov",".avi"]:
+            elif mode in ["MOV → MP4", "AVI → MP4"] and ext in [".mov",".avi"]:
                 out = f"output/{os.path.splitext(f.name)[0]}.mp4"
                 video_to_mp4(path, out, video_res)
                 videos.append(out)
 
         except Exception as e:
-            st.warning(f"⚠️ Gagal: {f.name} ({e})")
+            st.warning(f"⚠️ Gagal memproses {f.name}: {e}")
 
-        bar.progress((i+1)/len(files))
+        bar.progress((i + 1) / len(files))
 
-    # ZIP dokumen & gambar
+    # ================= PREVIEW PDF (HALAMAN 1) =================
+    pdf_files = [r for r in results if r.endswith(".pdf")]
+
+    if pdf_files:
+        st.subheader("📄 Preview PDF (Halaman Pertama)")
+        for pdf in pdf_files:
+            if os.path.exists(pdf):
+                img = preview_pdf_first_page(pdf)
+                if img and os.path.exists(img):
+                    st.markdown(f"**{os.path.basename(pdf)}**")
+                    st.image(img, use_container_width=True)
+
+                    with open(pdf, "rb") as f:
+                        st.download_button(
+                            "⬇️ Download PDF",
+                            f,
+                            file_name=os.path.basename(pdf),
+                            mime="application/pdf"
+                        )
+
+    # ================= DOWNLOAD FILE SATUAN =================
     if results:
+        st.subheader("📄 Download File Satuan")
+        for r in results:
+            if os.path.exists(r):
+                mime = (
+                    "application/pdf" if r.endswith(".pdf")
+                    else "image/png" if r.endswith(".png")
+                    else "image/jpeg"
+                )
+                st.download_button(
+                    f"⬇️ {os.path.basename(r)}",
+                    open(r, "rb"),
+                    file_name=os.path.basename(r),
+                    mime=mime
+                )
+
+        # ================= ZIP =================
         zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             for r in results:
                 safe_add_to_zip(z, r)
 
-        st.success("✅ Konversi Dokumen & Gambar Selesai")
-        st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
+        st.download_button(
+            "📦 Download ZIP (Semua File)",
+            open(zip_path, "rb"),
+            file_name=zip_path
+        )
 
-    # Video download
+    # ================= PREVIEW & DOWNLOAD VIDEO =================
     if videos:
-        st.subheader("🎬 Download Video")
+        st.subheader("🎬 Preview & Download Video")
+
         for v in videos:
-            st.download_button(
-                f"⬇️ {os.path.basename(v)}",
-                open(v,"rb"),
-                file_name=os.path.basename(v),
-                mime="video/mp4"
-            )
+            if os.path.exists(v):
+                st.video(v)
+                st.download_button(
+                    f"⬇️ Download {os.path.basename(v)}",
+                    open(v, "rb"),
+                    file_name=os.path.basename(v),
+                    mime="video/mp4"
+                )
+
+    st.success("🎉 Semua proses selesai!")
