@@ -35,13 +35,10 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ================= HEADER =================
-col1, col2 = st.columns([4,1])
-with col1:
-    st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
-with col2:
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
+st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai **{st.session_state.user.upper()}**")
+if st.button("🚪 Logout"):
+    st.session_state.clear()
+    st.rerun()
 
 # ================= HELPERS =================
 def save_temp(file):
@@ -53,6 +50,15 @@ def save_temp(file):
 def safe_add_to_zip(zipf, filepath):
     if filepath and os.path.exists(filepath):
         zipf.write(filepath, arcname=os.path.basename(filepath))
+
+def preview_pdf_first_page(pdf_path, dpi=120):
+    doc = fitz.open(pdf_path)
+    page = doc.load_page(0)
+    pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72))
+    img_path = pdf_path.replace(".pdf", "_preview.png")
+    pix.save(img_path)
+    doc.close()
+    return img_path
 
 # ================= CONVERTERS =================
 def pdf_to_png(pdf, out_dir, dpi):
@@ -66,41 +72,6 @@ def pdf_to_png(pdf, out_dir, dpi):
         res.append(out)
     return res
 
-def preview_pdf_first_page(pdf_path, dpi=120):
-    try:
-        doc = fitz.open(pdf_path)
-        page = doc.load_page(0)  # halaman pertama
-        mat = fitz.Matrix(dpi/72, dpi/72)
-        pix = page.get_pixmap(matrix=mat)
-        img_path = pdf_path.replace(".pdf", "_preview.png")
-        pix.save(img_path)
-        doc.close()
-        return img_path
-    except Exception as e:
-        st.error(f"Gagal preview PDF: {e}")
-        return None
-
-# ================= PREVIEW PDF =================
-pdf_files = [r for r in results if r.endswith(".pdf")]
-
-if pdf_files:
-    st.subheader("📄 Preview PDF")
-    for pdf in pdf_files:
-        if os.path.exists(pdf):
-            st.markdown(f"**{os.path.basename(pdf)}**")
-            st.pdf(pdf)
-
-def preview_pdf(path):
-    with open(path, "rb") as f:
-        base64_pdf = f.read()
-    st.download_button(
-        "⬇️ Download PDF",
-        base64_pdf,
-        file_name=os.path.basename(path),
-        mime="application/pdf"
-    )
-    st.pdf(path)
-
 def png_to_pdf(images, out_pdf):
     imgs = [Image.open(i).convert("RGB") for i in images]
     imgs[0].save(out_pdf, save_all=True, append_images=imgs[1:])
@@ -111,18 +82,12 @@ def pdf_to_word(pdf, out):
     c.close()
 
 def word_to_pdf(docx, out):
-    out_dir = os.path.dirname(out)
-
     subprocess.run(
-        ["libreoffice", "--headless", "--convert-to", "pdf", docx, "--outdir", out_dir],
+        ["libreoffice", "--headless", "--convert-to", "pdf", docx, "--outdir", "output"],
         check=True
     )
-
-    base = os.path.splitext(os.path.basename(docx))[0]
-    generated = os.path.join(out_dir, f"{base}.pdf")
-
-    if os.path.exists(generated) and generated != out:
-        os.rename(generated, out)
+    gen = f"output/{os.path.splitext(os.path.basename(docx))[0]}.pdf"
+    os.rename(gen, out)
 
 def excel_to_pdf(xlsx, out):
     df = pd.read_excel(xlsx)
@@ -141,54 +106,29 @@ def excel_to_pdf(xlsx, out):
 
 def video_to_mp4(video, out, res):
     clip = VideoFileClip(video)
-
-    if res == "480p":
-        clip = clip.resize(height=480)
-    elif res == "720p":
-        clip = clip.resize(height=720)
-    elif res == "1080p":
-        clip = clip.resize(height=1080)
-
-    clip.write_videofile(
-        out,
-        codec="libx264",
-        audio_codec="aac",
-        preset="ultrafast",
-        threads=2,
-        logger=None
-    )
+    if res != "Original":
+        clip = clip.resize(height=int(res.replace("p","")))
+    clip.write_videofile(out, codec="libx264", audio_codec="aac", preset="ultrafast", logger=None)
     clip.close()
 
 def jpg_to_png(img, out):
-    Image.open(img).convert("RGBA").save(out, "PNG")
+    Image.open(img).convert("RGBA").save(out)
 
 def png_to_jpg(img, out):
-    im = Image.open(img)
-    bg = Image.new("RGB", im.size, (255,255,255))
-    if im.mode == "RGBA":
-        bg.paste(im, mask=im.split()[3])
-    else:
-        bg.paste(im)
-    bg.save(out, "JPEG", quality=85)
+    im = Image.open(img).convert("RGB")
+    im.save(out, "JPEG", quality=85)
 
 # ================= UI =================
 mode = st.selectbox("📂 Mode Konversi", [
-    "PDF → PNG",
-    "PDF → Word",
-    "PNG → PDF",
-    "Word → PDF",
-    "Excel → PDF",
-    "JPG → PNG",
-    "PNG → JPG",
-    "MOV → MP4",
-    "AVI → MP4"
+    "PDF → PNG","PDF → Word","PNG → PDF","Word → PDF","Excel → PDF",
+    "JPG → PNG","PNG → JPG","MOV → MP4","AVI → MP4"
 ])
 
 video_res = "Original"
 if "MP4" in mode:
     video_res = st.selectbox("🎥 Resolusi Video", ["Original","480p","720p","1080p"])
 
-dpi = st.selectbox("🖼️ Resolusi DPI", [150,200,300,600])
+dpi = st.selectbox("🖼️ DPI (PDF → PNG)", [150,200,300])
 
 files = st.file_uploader(
     "📤 Upload File",
@@ -201,8 +141,7 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    results = []
-    videos = []
+    results, videos = [], []
     bar = st.progress(0)
 
     for i, f in enumerate(files):
@@ -211,14 +150,14 @@ if process and files:
 
         try:
             if mode == "PDF → PNG" and ext == ".pdf":
-                results.extend(pdf_to_png(path, "output", dpi))
+                results += pdf_to_png(path, "output", dpi)
 
             elif mode == "PDF → Word" and ext == ".pdf":
                 out = f"output/{f.name.replace('.pdf','.docx')}"
                 pdf_to_word(path, out)
                 results.append(out)
 
-            elif mode == "PNG → PDF" and ext in [".png",".jpg",".jpeg"]:
+            elif mode == "PNG → PDF":
                 out = f"output/{os.path.splitext(f.name)[0]}.pdf"
                 png_to_pdf([path], out)
                 results.append(out)
@@ -228,92 +167,53 @@ if process and files:
                 word_to_pdf(path, out)
                 results.append(out)
 
-            elif mode == "Excel → PDF" and ext == ".xlsx":
+            elif mode == "Excel → PDF":
                 out = f"output/{f.name.replace('.xlsx','.pdf')}"
                 excel_to_pdf(path, out)
                 results.append(out)
 
-            elif mode == "JPG → PNG" and ext in [".jpg",".jpeg"]:
+            elif mode == "JPG → PNG":
                 out = f"output/{os.path.splitext(f.name)[0]}.png"
                 jpg_to_png(path, out)
                 results.append(out)
 
-            elif mode == "PNG → JPG" and ext == ".png":
+            elif mode == "PNG → JPG":
                 out = f"output/{os.path.splitext(f.name)[0]}.jpg"
                 png_to_jpg(path, out)
                 results.append(out)
 
-            elif mode in ["MOV → MP4", "AVI → MP4"] and ext in [".mov",".avi"]:
+            elif "MP4" in mode:
                 out = f"output/{os.path.splitext(f.name)[0]}.mp4"
                 video_to_mp4(path, out, video_res)
                 videos.append(out)
 
         except Exception as e:
-            st.warning(f"⚠️ Gagal memproses {f.name}: {e}")
+            st.error(f"❌ {f.name} gagal: {e}")
 
-        bar.progress((i + 1) / len(files))
+        bar.progress((i+1)/len(files))
 
-    # ================= PREVIEW PDF (HALAMAN 1) =================
-    pdf_files = [r for r in results if r.endswith(".pdf")]
+# ================= PREVIEW PDF =================
+if results:
+    pdfs = [r for r in results if r.endswith(".pdf")]
+    if pdfs:
+        st.subheader("📄 Preview PDF (Halaman 1)")
+        for pdf in pdfs:
+            img = preview_pdf_first_page(pdf)
+            st.image(img, use_container_width=True)
+            st.download_button("⬇️ Download PDF", open(pdf,"rb"), file_name=os.path.basename(pdf))
 
-    if pdf_files:
-        st.subheader("📄 Preview PDF (Halaman Pertama)")
-        for pdf in pdf_files:
-            if os.path.exists(pdf):
-                img = preview_pdf_first_page(pdf)
-                if img and os.path.exists(img):
-                    st.markdown(f"**{os.path.basename(pdf)}**")
-                    st.image(img, use_container_width=True)
-
-                    with open(pdf, "rb") as f:
-                        st.download_button(
-                            "⬇️ Download PDF",
-                            f,
-                            file_name=os.path.basename(pdf),
-                            mime="application/pdf"
-                        )
-
-    # ================= DOWNLOAD FILE SATUAN =================
-    if results:
-        st.subheader("📄 Download File Satuan")
+# ================= DOWNLOAD FILE =================
+if results:
+    zip_path = "HASIL_KONVERSI.zip"
+    with zipfile.ZipFile(zip_path,"w") as z:
         for r in results:
-            if os.path.exists(r):
-                mime = (
-                    "application/pdf" if r.endswith(".pdf")
-                    else "image/png" if r.endswith(".png")
-                    else "image/jpeg"
-                )
-                st.download_button(
-                    f"⬇️ {os.path.basename(r)}",
-                    open(r, "rb"),
-                    file_name=os.path.basename(r),
-                    mime=mime
-                )
+            safe_add_to_zip(z, r)
 
-        # ================= ZIP =================
-        zip_path = "HASIL_KONVERSI.zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-            for r in results:
-                safe_add_to_zip(z, r)
+    st.download_button("📦 Download ZIP", open(zip_path,"rb"), file_name=zip_path)
 
-        st.download_button(
-            "📦 Download ZIP (Semua File)",
-            open(zip_path, "rb"),
-            file_name=zip_path
-        )
-
-    # ================= PREVIEW & DOWNLOAD VIDEO =================
-    if videos:
-        st.subheader("🎬 Preview & Download Video")
-
-        for v in videos:
-            if os.path.exists(v):
-                st.video(v)
-                st.download_button(
-                    f"⬇️ Download {os.path.basename(v)}",
-                    open(v, "rb"),
-                    file_name=os.path.basename(v),
-                    mime="video/mp4"
-                )
-
-    st.success("🎉 Semua proses selesai!")
+# ================= VIDEO =================
+if videos:
+    st.subheader("🎬 Preview & Download Video")
+    for v in videos:
+        st.video(v)
+        st.download_button("⬇️ Download MP4", open(v,"rb"), file_name=os.path.basename(v))
