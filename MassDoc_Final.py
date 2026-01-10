@@ -138,7 +138,8 @@ process = st.button("🚀 PROSES")
 # ================= PROCESS =================
 if process and files:
     os.makedirs("output", exist_ok=True)
-    results = []
+    results = []        # untuk dokumen & gambar
+    video_results = []  # khusus video
     bar = st.progress(0)
 
     for i, f in enumerate(files):
@@ -176,15 +177,33 @@ if process and files:
         elif mode == "MOV → MP4" and ext == ".mov":
             out = f"output/{f.name.replace('.mov','.mp4')}"
             mov_to_mp4(path, out, video_res)
-            results.append(out)
+            video_results.append(out)
 
         bar.progress((i + 1) / len(files))
 
+    # ================= ZIP (NON VIDEO) =================
     if results:
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path, "w") as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
 
-        st.success("🎉 Proses Selesai")
-        st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
+        st.success("🎉 Proses Dokumen Selesai")
+        st.download_button(
+            "📦 Download ZIP (Dokumen & Gambar)",
+            open(zip_path, "rb"),
+            file_name=zip_path
+        )
+
+    # ================= DOWNLOAD VIDEO =================
+    if video_results:
+        st.subheader("🎬 Download Video (Tanpa ZIP)")
+
+        for v in video_results:
+            with open(v, "rb") as vf:
+                st.download_button(
+                    label=f"⬇️ Download {os.path.basename(v)}",
+                    data=vf,
+                    file_name=os.path.basename(v),
+                    mime="video/mp4"
+                )
