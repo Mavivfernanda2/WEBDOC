@@ -11,85 +11,37 @@ from rembg import remove
 from moviepy.editor import VideoFileClip
 
 # ================= PAGE CONFIG =================
-st.set_page_config(
-    page_title="Apiep Doc Converter",
-    layout="centered"
-)
+st.set_page_config(page_title="Apiep Doc Converter", layout="centered")
 
 # ================= AUTH CONFIG =================
-USERS = {
-    "guru": "apiep123",
-    "admin": "admin123"
-}
+USERS = {"guru": "apiep123", "admin": "admin123"}
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = ""
 
-# ================= LOGIN PAGE =================
+# ================= LOGIN =================
 def login_page():
-    st.markdown('<div class="glass">', unsafe_allow_html=True)
     st.subheader("🔐 Login Guru")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if username in USERS and USERS[username] == password:
+        if u in USERS and USERS[u] == p:
             st.session_state.logged_in = True
-            st.session_state.user = username
+            st.session_state.user = u
             st.rerun()
         else:
             st.error("❌ Username atau Password salah")
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ================= LOGOUT =================
-def logout_button():
-    if st.button("🚪 Logout", key="logout"):
-        st.session_state.clear()
-        st.rerun()
-
-# ================= AUTH GUARD =================
 if not st.session_state.logged_in:
     login_page()
     st.stop()
 
-# ================= STYLE =================
-st.markdown("""
-<style>
-html, body {
-    background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
-}
-.glass {
-    background: rgba(255,255,255,0.12);
-    backdrop-filter: blur(16px);
-    border-radius: 24px;
-    padding: 24px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-    margin-bottom: 25px;
-}
-h1,h2,h3,label,p { color: white !important; }
-.stButton>button {
-    background: linear-gradient(90deg,#00c6ff,#0072ff);
-    color:white; border-radius:14px;
-    padding:0.6em 1.4em; font-weight:600;
-}
-[data-testid="stFileUploader"] {
-    border:2px dashed rgba(255,255,255,0.4);
-    border-radius:20px; padding:25px;
-    background:rgba(255,255,255,0.05);
-}
-</style>
-""", unsafe_allow_html=True)
-
-logout_button()
-
 # ================= HEADER =================
 st.markdown(f"""
-<div class="glass">
-    <h1>🧰 Apiep Doc Converter</h1>
-    <p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
+<div style="color:white">
+<h1>🧰 Apiep Doc Converter</h1>
+<p>Login sebagai <b>{st.session_state.user.upper()}</b></p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -118,12 +70,6 @@ def png_to_pdf(images, out_pdf):
 def remove_bg_img(img, out):
     remove(Image.open(img).convert("RGBA")).save(out, format="PNG")
 
-def watermark_img(img_path, text):
-    img = Image.open(img_path).convert("RGBA")
-    draw = ImageDraw.Draw(img)
-    draw.text((20, img.height-40), text, fill=(180,180,180,120))
-    img.save(img_path)
-
 def pdf_to_word(pdf, out):
     c = Converter(pdf)
     c.convert(out)
@@ -147,15 +93,21 @@ def excel_to_pdf(xlsx, out):
             y = A4[1] - 40
     c.save()
 
-# 🔥 MOV → MP4
-def mov_to_mp4(mov, out):
+# 🎥 MOV → MP4 + RESOLUSI
+def mov_to_mp4(mov, out, resolution):
     clip = VideoFileClip(mov)
+
+    if resolution == "480p":
+        clip = clip.resize(height=480)
+    elif resolution == "720p":
+        clip = clip.resize(height=720)
+    elif resolution == "1080p":
+        clip = clip.resize(height=1080)
+
     clip.write_videofile(out, codec="libx264", audio_codec="aac")
     clip.close()
 
 # ================= UI =================
-st.markdown('<div class="glass">', unsafe_allow_html=True)
-
 mode = st.selectbox("📂 Mode Konversi", [
     "PDF → PNG",
     "PDF → Word",
@@ -166,16 +118,22 @@ mode = st.selectbox("📂 Mode Konversi", [
     "MOV → MP4"
 ])
 
+# 🎥 PILIH RESOLUSI VIDEO
+video_res = "Original"
+if mode == "MOV → MP4":
+    video_res = st.selectbox("🎥 Resolusi Video", [
+        "Original", "480p", "720p", "1080p"
+    ])
+
 dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
 
 files = st.file_uploader(
-    "📤 Drag & Drop File",
+    "📤 Upload File",
     accept_multiple_files=True,
     type=["pdf","png","jpg","jpeg","docx","xlsx","mov"]
 )
 
 process = st.button("🚀 PROSES")
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= PROCESS =================
 if process and files:
@@ -217,17 +175,16 @@ if process and files:
 
         elif mode == "MOV → MP4" and ext == ".mov":
             out = f"output/{f.name.replace('.mov','.mp4')}"
-            mov_to_mp4(path, out)
+            mov_to_mp4(path, out, video_res)
             results.append(out)
 
         bar.progress((i + 1) / len(files))
 
     if results:
-        st.success("🎉 Proses Selesai")
-
         zip_path = "HASIL_KONVERSI.zip"
         with zipfile.ZipFile(zip_path, "w") as z:
             for r in results:
                 z.write(r, arcname=os.path.basename(r))
 
+        st.success("🎉 Proses Selesai")
         st.download_button("📦 Download ZIP", open(zip_path, "rb"), file_name=zip_path)
