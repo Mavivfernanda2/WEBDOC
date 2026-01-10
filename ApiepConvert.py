@@ -19,7 +19,7 @@ if "videos" not in st.session_state:
     st.session_state.videos = []
 
 # ================= HEADER =================
-st.markdown("## 🧰 Apiep Doc Converter\nKonversi Dokumen Video & Gambar Serba Praktis 🚀")
+st.markdown("## 🧰 Apiep Doc Converter\nKonversi Dokumen, Video & Gambar Serba Praktis 🚀")
 
 # ================= HELPERS =================
 def save_temp(file):
