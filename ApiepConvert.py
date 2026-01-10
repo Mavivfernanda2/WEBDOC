@@ -16,9 +16,6 @@ col1, col2 = st.columns([4,1])
 with col1:
     st.markdown(f"## 🧰 Apiep Doc Converter\nLogin sebagai *{st.session_state.user.upper()}*")
 with col2:
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
 # ================= HELPERS =================
 def save_temp(file):
     path = f"temp_{file.name}"
