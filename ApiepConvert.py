@@ -160,9 +160,6 @@ mode = st.selectbox("⚙️ Mode Konversi", [...])
 files = st.file_uploader("📤 Upload File", accept_multiple_files=True)
 advanced = st.toggle("🎛 Advanced Mode")
 
-files=st.file_uploader("📤 Upload File",accept_multiple_files=True)
-advanced=st.toggle("🎛 Advanced Mode")
-
 if advanced:
     dpi=st.selectbox("🖼 DPI", [150,200,300,600])
     video_res=st.selectbox("🎥 Resolusi Video",["Original","480p","720p","1080p"])
