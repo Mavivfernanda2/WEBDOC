@@ -35,6 +35,8 @@ def login_page():
 if not st.session_state.logged_in:
     login_page()
     st.stop()
+    
+st.info("⏳ Aplikasi sedang disiapkan, mohon tunggu...")
 
 # ================= HEADER =================
 col1, col2 = st.columns([4,1])
