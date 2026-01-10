@@ -103,6 +103,8 @@ def mov_to_mp4(video, out, resolution):
         clip = clip.resize(height=720)
     elif resolution == "1080p":
         clip = clip.resize(height=1080)
+     elif resolution == "2K":
+        clip = clip.resize(height=2K)
 
     clip.write_videofile(out, codec="libx264", audio_codec="aac")
     clip.close()
@@ -117,6 +119,8 @@ def mov_to_mp4(mov, out, resolution):
         clip = clip.resize(height=720)
     elif resolution == "1080p":
         clip = clip.resize(height=1080)
+    elif resolution == "2K":
+        clip = clip.resize(height=2K)
 
     clip.write_videofile(out, codec="libx264", audio_codec="aac")
     clip.close()
@@ -160,7 +164,7 @@ video_res = "Original"
 if mode in ["MOV → MP4", "AVI → MP4"]:
     video_res = st.selectbox(
         "🎥 Resolusi Video",
-        ["Original", "480p", "720p", "1080p"]
+        ["Original", "480p", "720p", "1080p", "2K"]
     )
 
 dpi = st.selectbox("Resolusi DPI", [150, 200, 300, 600, 800])
