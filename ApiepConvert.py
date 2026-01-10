@@ -154,12 +154,11 @@ def png_to_jpg(img,out):
     bg.save(out,"JPEG",quality=85)
 
 # ================= UI =================
-st.markdown('<div class="glass">',unsafe_allow_html=True)
+st.markdown('<div class="glass">', unsafe_allow_html=True)
 
-mode=st.selectbox("⚙️ Mode Konversi",[
-    "PDF → PNG","PDF → Word","PNG → PDF","Word → PDF",
-    "Excel → PDF","JPG → PNG","PNG → JPG","MOV → MP4","AVI → MP4"
-])
+mode = st.selectbox("⚙️ Mode Konversi", [...])
+files = st.file_uploader("📤 Upload File", accept_multiple_files=True)
+advanced = st.toggle("🎛 Advanced Mode")
 
 files=st.file_uploader("📤 Upload File",accept_multiple_files=True)
 advanced=st.toggle("🎛 Advanced Mode")
@@ -171,7 +170,7 @@ else:
     dpi=150
     video_res="Original"
 
-st.markdown('</div>',unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= PROCESS =================
 if st.button("🚀 PROSES") and files:
