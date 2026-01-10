@@ -1,9 +1,9 @@
 streamlit
-pymupdf
-pillow
+PyMuPDF
+Pillow
+pandas
 pdf2docx
 docx2pdf
-pandas
 reportlab
 rembg
-onnxruntime
+moviepy
